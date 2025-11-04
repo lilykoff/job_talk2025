@@ -17,6 +17,7 @@ format:
     width: 1400
     height: 850
     html-math-method: mathjax
+    embed-resources: true
 code: 
   echo: false
   cache: true 
@@ -2648,7 +2649,7 @@ df2 %>%
 ## Digital fingerprinting with hemodynamics data 
 
 #### Preliminary hemodynamics work
-Summarizing times in fine-grained ranges of mean arterial pressure and caridac index or central venous pressure 
+Summarizing times in fine-grained ranges of mean arterial pressure and cardiac index or central venous pressure 
 
 ```{r}
 # show some work from the MAP/CVP and MAP/CI papers
