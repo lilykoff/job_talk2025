@@ -38,6 +38,9 @@ library(ggrepel)
 library(broom)
 library(survival)
 options(digits.secs = 3)
+range_left = function(x, left, right){
+  ifelse(x > left & x <= right, TRUE, FALSE)
+}
 ```
 
 ```{r ggplot theme}
@@ -79,6 +82,111 @@ get_density <- function(x, y, ...) {
 ```
 
 ```{r data read in and processing}
+hemo_res = read_rds(here::here("docs", "data", "bricks_regressions.rds")) %>% 
+  filter(type == "adjusted", outcome == "AKI48") %>% 
+  separate_wider_delim(term, delim = "]", names = c("MAP", "CVP", "x")) %>% 
+  mutate(map_fct = factor(MAP, levels = c("MAP[45,55", "MAP(55,65", 
+                                          "MAP(65,75", "MAP(75,85", "MAP(85,95", "MAP(95,105", "MAP(105,115"),
+                          labels = c("[45,55]", "(55,65]", "(65,75]",
+                                     "(75,85]", "(85,95]", "(95,105]",
+                                     "(105,115]")),
+         cvp_fct = factor(CVP, levels = c("CVP[0,2", "CVP(2,4", 
+                                          "CVP(4,6", "CVP(6,8", "CVP(8,10", "CVP(10,12", "CVP(12,14", "CVP(14,16", "CVP(16,18", 
+                                          "CVP(18,20"),
+                          labels = c("[0,2]", "(2,4]", "(4,6]",
+                                     "(6,8]", "(8,10]", "(10,12]",
+                                     "(12,14]", "(14,16]", "(16,18]", "(18,20]")))
+
+
+hemo_ts = read_rds(here::here("docs", "data", "hemo_timeseries_interp_post_exclusion.rds")) %>% 
+  as_tibble() %>% 
+  filter(id == id[1])
+
+hemo_ts_plotdf = 
+  hemo_ts %>% 
+  mutate(time_elaps = as.numeric(difftime(time, min(time),
+                               units = "hours"))) %>% 
+  mutate(
+    group = case_when(
+      range_left(val_MAP, 95, 115) & between(val_CVP, 0, 8) ~ "group_1",
+      (range_left(val_MAP, 75, 95) & between(val_CVP, 0, 8)) | 
+        (range_left(val_MAP, 85, 115) & range_left(val_CVP, 8, 10)) ~ "group_2",
+      (range_left(val_MAP, 55, 75) & between(val_CVP, 0, 8)) | 
+        (range_left(val_MAP, 65, 85) & range_left(val_CVP, 8, 12)) | 
+        (range_left(val_MAP, 85, 115) & range_left(val_CVP, 10, 12)) ~ "group_3",
+      (between(val_MAP, 45, 55) & between(val_CVP, 0, 8)) | 
+        (range_left(val_MAP, 55, 65) & range_left(val_CVP, 8, 12)) | 
+        (range_left(val_MAP, 65, 115) & range_left(val_CVP, 12, 16)) | 
+        (range_left(val_MAP, 85, 115) & range_left(val_CVP, 16, 18)) ~ "group_4",
+      (between(val_MAP, 45, 55) & range_left(val_CVP, 8, 20)) | 
+        (range_left(val_MAP, 55, 65) & range_left(val_CVP, 12, 20)) | 
+        (range_left(val_MAP, 65, 85) & range_left(val_CVP, 16, 20)) | 
+        (range_left(val_MAP, 85, 115) & range_left(val_CVP, 18, 20)) ~ "group_5")) %>% 
+  mutate(danger2 = if_else(group == "group_5" | group == "group_4", 1, 0)) %>% 
+  pivot_longer(cols = c(val_MAP, val_CVP),
+               names_to = "param",
+               values_to = "value") %>% 
+  mutate(danger = case_when(
+    param == "val_CVP" & value < 8 ~ 1,
+    param == "val_CVP" & value > 12 ~ 1,
+    param == "val_MAP" & value < 65 ~ 1,
+    .default = 0
+  )) %>% 
+  mutate(param = factor(param, labels = c("Central Venous Pressure", "Mean Arterial Pressure"))) %>% 
+  mutate(change = danger != danger2 & !is.na(danger2),
+         change = replace_na(change, 0)) 
+
+shell_res = read_rds(here::here("docs", "data", "shell_regressions_5.rds"))
+
+
+hemo_ts_all = read_rds(here::here("docs", "data", "hemo_timeseries_interp_post_exclusion.rds")) %>% 
+  as_tibble()
+
+
+plotdf = hemo_ts_all %>% 
+  mutate(
+    group = case_when(
+      range_left(val_MAP, 95, 115) & between(val_CVP, 0, 8) ~ "group_1",
+      (range_left(val_MAP, 75, 95) & between(val_CVP, 0, 8)) | 
+        (range_left(val_MAP, 85, 115) & range_left(val_CVP, 8, 10)) ~ "group_2",
+      (range_left(val_MAP, 55, 75) & between(val_CVP, 0, 8)) | 
+        (range_left(val_MAP, 65, 85) & range_left(val_CVP, 8, 12)) | 
+        (range_left(val_MAP, 85, 115) & range_left(val_CVP, 10, 12)) ~ "group_3",
+      (between(val_MAP, 45, 55) & between(val_CVP, 0, 8)) | 
+        (range_left(val_MAP, 55, 65) & range_left(val_CVP, 8, 12)) | 
+        (range_left(val_MAP, 65, 115) & range_left(val_CVP, 12, 16)) | 
+        (range_left(val_MAP, 85, 115) & range_left(val_CVP, 16, 18)) ~ "group_4",
+      (between(val_MAP, 45, 55) & range_left(val_CVP, 8, 20)) | 
+        (range_left(val_MAP, 55, 65) & range_left(val_CVP, 12, 20)) | 
+        (range_left(val_MAP, 65, 85) & range_left(val_CVP, 16, 20)) | 
+        (range_left(val_MAP, 85, 115) & range_left(val_CVP, 18, 20)) ~ "group_5"
+    ),
+    cut_MAP = cut(
+      val_MAP,
+      breaks = seq(45, 115, 10),
+      include.lowest = T
+    ),
+    cut_CVP = cut(
+      val_CVP,
+      breaks = seq(0, 20, 2),
+      include.lowest = T
+    )
+  ) %>%
+  dplyr::count(cut_MAP, cut_CVP, group, .drop = F) %>% 
+  drop_na() %>% group_by(cut_MAP, cut_CVP, group) %>%
+  summarize(mean = mean(n)) 
+
+              
+multi_results_plt = 
+  shell_res %>% 
+  filter(grepl("group", term)) %>%
+  bind_cols(cut_MAP = c("(95,105]", "(75,85]", "(55,65]", "(95,105]", 
+                        "[45,55]"),
+            cut_CVP = c("(2,4]", "(2,4]", "(4,6]", "(14,16]", "(14,16]")) %>% 
+  rename(group = term) %>% 
+  mutate(pval = ifelse(p.value < 0.001, "p < 0.001", paste0("p = ", round(p.value, 3))))  
+
+
 fosr = read_rds(here::here("docs", "data", "mims_application_1440.rds"))
 
 pa_df = read_rds(here::here("docs", "data", "mims_covariates.rds")) 
@@ -2649,9 +2757,121 @@ df2 %>%
 ## Digital fingerprinting with hemodynamics data 
 
 #### Preliminary hemodynamics work
-Summarizing times in fine-grained ranges of mean arterial pressure and cardiac index or central venous pressure 
+Coarse literature targets for MAP and CVP
 
-```{r}
-# show some work from the MAP/CVP and MAP/CI papers
+
+```{r time series hemo}
+hemo_ts_plotdf %>% 
+  ggplot(aes(x = time_elaps, y = value)) + 
+  facet_grid(param ~ ., scales = "free_y") + 
+  geom_point(size = 0.8, aes(color = factor(danger))) + 
+  # geom_line() + 
+  labs(x = "Time since start of surgery (hours)", y = "Hemodynamic Value") +
+  theme(legend.position = "bottom") + 
+  scale_color_manual(values = c("#000000", "#56B4E9"),
+                     name = "Within recommended range\n(from literature)",
+                     labels = c("Yes", "No"))
 
 ```
+
+---
+
+#### Preliminary hemodynamics work
+MAP and CVP are not independent; they occur simultaneously
+
+```{r heatmap}
+hemo_res %>% 
+  ggplot(aes(x = map_fct, y = cvp_fct, fill = estimate, label = format(estimate, digits = 2, nsmall = 2))) + 
+  geom_tile(color = "black") + 
+  geom_text() + 
+  scale_fill_binned(aesthetics="fill",
+                    scale_name ="stepsn",
+                    palette=function(x) 
+  c("#5D82F0", "#7897F2" ,"#93ACF5" ,"#AEC0F7", "#C9D5FA", "#E4EAFC", "#FFFFFF"
+ , "#FFE1E1", "#FFC3C3", "#FFA6A6" ,"#FF8888" ,"#FF6B6B" ,"#FF4D4D", "#FF3030"), breaks=c(0.5,0.6,0.7,0.8,0.9,0.97,1.02,1/0.9,1/0.8,1/0.7,1/0.6,1/0.5,1/0.4,round(max(hemo_res$estimate+.1), 1)),guide="colorsteps") +
+  theme(legend.position = "none") +
+  labs(x = "Mean Arterial Pressure Range", y = "Central Venous Pressure Range", title = "Odds Ratios of AKI",
+  subtitle = "Associated with spending 5 additional minutes in given range")
+  
+```
+
+---
+
+#### Preliminary hemodynamics work
+MAP and CVP are not independent; they occur simultaneously
+
+```{r zone plot}
+g1 = "#AEC0F7"
+g2 = "#FFFFFF"
+g3 = "#FFE1E1"
+g4 = "#FFC3C3"
+g5 = "#FF8888"
+
+
+
+res_plot = 
+  multi_results_plt %>% 
+              select(group, pval, cut_MAP, cut_CVP, estimate) %>% 
+              rename(pval_multi = pval,
+                     estimate_multi = estimate) %>% 
+  mutate(estimate_multi2 = c(0.93, 1.01, 1.02, 1.03, 1.06))
+
+plotdf %>%
+  ggplot(aes(
+    x = cut_MAP,
+    y = cut_CVP,
+    fill = group
+  )) + geom_tile(col = "black") +
+  labs(
+    x = "MAP (mmHg)",
+    y = "CVP (mmHg)",
+    fill = "Odds Ratio",
+    title = ""
+  ) +
+  scale_fill_manual(values = c(g1, g2, g3, g4, g5))+
+  theme(legend.position = "none")+
+  geom_label(data = res_plot, 
+             aes(x = cut_MAP, y = cut_CVP,
+          label = paste0("OR = ", estimate_multi2, "\n", pval_multi)),
+             col = "black", hjust = 0)
+
+  
+```
+
+---
+
+#### Preliminary hemodynamics work
+MAP and CVP are not independent; they occur simultaneously
+
+```{r plot new values}
+hemo_ts_plotdf  %>% 
+  ggplot(aes(x = time_elaps, y = value)) + 
+  facet_grid(param ~ ., scales = "free_y") + 
+  geom_point(size = 0.8, aes(color = factor(danger2))) + 
+  # geom_line() + 
+  labs(x = "Time since start of surgery (hours)", y = "Hemodynamic Value") +
+  theme(legend.position = "bottom") + 
+  scale_color_manual(values = c("#000000", "#56B4E9"),
+                     name = "Within recommended range\n(from our work)",
+                     labels = c("Yes", "No"))
+```
+
+---
+
+#### Preliminary hemodynamics work
+MAP and CVP are not independent; they occur simultaneously
+
+```{r how did things change}
+hemo_ts_plotdf %>% 
+  ggplot(aes(x = time_elaps, y = value)) + 
+  facet_grid(param ~ ., scales = "free_y") + 
+  geom_point(size = 0.8, aes(color = factor(change))) + 
+  # geom_line() + 
+  labs(x = "Time since start of surgery (hours)", y = "Hemodynamic Value") +
+  theme(legend.position = "bottom") +
+  scale_color_manual(values = c("#5D82F0", "#FF4D4D", "darkgrey"),
+                     name = "Change with our analysis")
+
+
+```
+
