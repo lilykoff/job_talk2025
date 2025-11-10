@@ -5,7 +5,6 @@ author: "Lily Koffman"
 format:
   revealjs:
     theme: custom.scss
-    transition: fade
     slide-number: false
     toc: false
     progress: true
@@ -153,6 +152,8 @@ scale_fill_okabe  <- function(...) scale_fill_manual(values = okabe_ito, ...)
 ```
 
 ```{r data read in and processing}
+#| cache: true 
+
 # ----- hemodynamics results ----- # 
 hemo_res = read_rds(here::here("docs", "data", "bricks_regressions.rds")) %>% 
   filter(type == "adjusted", outcome == "AKI48") %>% 
@@ -544,17 +545,17 @@ p1 = pa_data %>%
   ) 
 
 p3 = p1 + annotate(geom = "rect", xmin = start, xmax = end, ymin = -Inf, ymax = Inf, fill = "#D55E00", alpha = .5) +
-  geom_curve(
-    aes(x = start - 1, y = 3, xend = start, yend = 6),
-    arrow = arrow(length = unit(0.25, "inches"), type = "closed"),
-    curvature = 0.3,
-    color = "#444444",
-    linewidth = 1
-  ) +
+  # geom_curve(
+  #   aes(x = end, y = 3, xend = end + as.period(5, "minutes"), yend = 6),
+  #   arrow = arrow(length = unit(0.1, "inches"), type = "closed"),
+  #   curvature = 0.3,
+  #   color = "#444444",
+  #   linewidth = .8
+  # ) +
   annotate(
-    "text",
-    x = start - 1, y = 4,
-    label = "Highlighted period",
+    "label",
+    x = end, y = 5.5,
+    label = "Inset period",
     hjust = 0, size = 4, color = "#D55E00"
   )
 
@@ -578,7 +579,7 @@ p1
 ---
 
 ```{r print zoom in pa plot}
-#| cache: true 
+#| cache: true
 p3 + inset_element(p2, 0.6, 0.6, 1, 1, align_to = "full")
 ```
 
@@ -606,8 +607,22 @@ p1
 ---
 
 ```{r hemos plot with inset}
+#| cache: true
 p3 = p1 + annotate(geom = "rect", xmin = start, xmax = end, ymax = Inf, ymin = -Inf,
-            fill = "#D55E00", alpha = 0.5)
+            fill = "#D55E00", alpha = 0.5) +
+  # geom_curve(
+  #   aes(x = end, y = 120, xend = end + as.period(5, "minutes"), yend = 150),
+  #   arrow = arrow(length = unit(0.25, "inches"), type = "closed"),
+  #   curvature = 0.3,
+  #   color = "#444444",
+  #   linewidth = 1
+  # ) +
+  annotate(
+    "label",
+    x = end, y = 130,
+    label = "Inset period",
+    hjust = 0, size = 4, color = "#D55E00"
+  )
 
 
 p2 = hemo_data %>% 
@@ -636,7 +651,7 @@ timeline = tibble(
     "Fingerprinting:\nIdentifying people from walking\naccelerometry data",
     "Step counting:\nalgorithm comparison and\napplication in NHANES",
     "Survey-weighted FOSR\n(motivated by NHANES)",
-    "Fingerprinting\nwith hemodynamics data"
+    "Hemodynamics data:\nPreliminary work and\nfingerprinting"
   )
 )
 
@@ -2534,6 +2549,7 @@ result_df = tibble(n = c(30, 153, 153, 100, 100, 500, 500, 1000, 1000, 14000, 10
 
 result_df %>% 
   ggplot(aes(x = n, y = accuracy)) + 
+  # facet_grid(.~paradigm) +
   geom_point(aes(color = paradigm, shape = setting), size = 5) +
   scale_x_log10(breaks = c(30, 153, 100, 500, 1000, 10000, 14000), 
                 labels = c(30, 153, 100, 500, 1000, 10000, 14000))  +
@@ -2552,6 +2568,7 @@ result_df %>%
 ```{r results1}
 result_df %>% 
   ggplot(aes(x = n, y = accuracy)) + 
+  # facet_grid(.~paradigm) +
   geom_point(aes(color = paradigm, shape = setting), size = 5) +
   scale_x_log10(breaks = c(30, 153, 100, 500, 1000, 10000, 14000), 
                 labels = c(30, 153, 100, 500, 1000, 10000, 14000))  +
@@ -2655,14 +2672,16 @@ df_fine %>%
 + Nationally representative survey of US 
 + Free-living accelerometry
 + Physical activity summaries: not interpretable or translatable
-+ Steps: measure of PA that are easy to understand
-+ Can we accurately count steps from free-living data? 
++ Steps: easy to understand measure of physical activity
++ Can we accurately count steps from free-living accelerometry? 
 
 :::
 
 ---
 
 ### Open source step counting
+
+Step estimates vary greatly between algorithms 
 
 ```{r ridges1}
 steps %>% 
@@ -2673,7 +2692,6 @@ steps %>%
   ggplot(aes(x = value, y = name, fill = gender, color = gender)) +
   geom_density_ridges2(scale = 2, quantile_lines = TRUE, quantiles = 2,
                        alpha = .5) +
-  # facet_grid(.~age_cat) +
   scale_x_continuous(limits=c(0,30000),
                      labels = seq(0, 30, 5),
                      breaks = seq(0, 30000, 5000)) +
@@ -2681,8 +2699,46 @@ steps %>%
   scale_fill_manual(values = c("#CC79A7", "#009E73"), name = "") +
   scale_color_manual(values = c("#CC79A7", "#009E73"), name = "") +
   theme(legend.position = "bottom") +
-  labs(x = "Mean steps per day (x1000)", y = "Algorithm", title = "Stepping patterns by algorithm and sex")
-
+  labs(x = "Mean steps per day (x1000)", y = "Algorithm", title = "Stepping patterns by algorithm and sex")  +
+  annotate(
+    geom = "text",
+    x = 10000,
+    y = 1.5,
+    label = "Median male steps = 2150",
+    hjust = 0,
+    color = "#009E73"
+  )  +
+  geom_segment(
+    aes(
+      xend = median(steps$total_adeptsteps[steps$gender == "Male"]),
+      y = 1.5,
+      x = 10000,
+      yend = 1.5
+    ),
+    arrow = arrow(length = unit(0.1, "inches"), type = "closed"),
+    color = "#444444",
+    linewidth = .5
+  ) +
+  annotate(
+    geom = "text",
+    x = 17000,
+    y = 6.75,
+    label = "Median male steps = 13000",
+    hjust = 0,
+    color = "#009E73"
+  )  +
+  geom_segment(
+    aes(
+      xend = median(steps$total_actisteps[steps$gender == "Male"]),
+      y = 6.75,
+      x = 17000,
+      yend = 7.25
+    ),
+    arrow = arrow(length = unit(0.1, "inches"), type = "closed"),
+    color = "#444444",
+    linewidth = .5
+  ) 
+  
 
 
 ```
@@ -2690,6 +2746,8 @@ steps %>%
 ---
 
 ### Open source step counting
+
+But all algorithms estimate decline with age 
 
 ```{r ridges 2}
 # steps %>% 
@@ -2713,6 +2771,16 @@ steps %>%
 #   labs(x = "Mean steps per day (x1000)", y = "Algorithm") +
 #   guides(fill = guide_legend(nrow = 1)) 
 
+xdf = steps %>% 
+  select(age = age_in_years_at_screening, gender,(contains("total") & contains("step"))) %>% 
+  mutate(age = if_else(is.na(age), 0, age)) %>% 
+  mutate(age_cat = cut(age, breaks = c(0, 18, 30, 40, 50, 60, 70, Inf)), include.lowest = TRUE) 
+
+m_ya = median(xdf$total_actisteps[xdf$age_cat == "(18,30]"])
+m_child  = median(xdf$total_actisteps[xdf$age_cat == "(0,18]"])
+m_old = median(xdf$total_actisteps[xdf$age_cat == "(70,Inf]"])
+
+
 steps %>% 
   select(age = age_in_years_at_screening, gender,(contains("total") & contains("step"))) %>% 
   mutate(age = if_else(is.na(age), 0, age)) %>% 
@@ -2721,23 +2789,68 @@ steps %>%
                names_transform = ~sub(".*total\\_(.+)steps.*", "\\1", .x)) %>% 
   mutate(name = fct_reorder(name, value, mean)) %>% 
   ggplot(aes(x = value, y = age_cat, fill = name, color = name)) +
-  geom_density_ridges2(scale = 2, color = "transparent",
-                       alpha = .5) +
-  # facet_grid(.~age_cat) +
+  geom_density_ridges2(scale = 2, 
+                       alpha = .5,
+                       # color = "transparent",
+                       ) +
   scale_x_continuous(limits=c(0,25000),
                      labels = seq(0, 30, 5),
                      breaks = seq(0, 30000, 5000)) +
   scale_fill_viridis_d(option ="B", labels = c("ADEPT", "SSL", "Verisense v2", "Verisense", "RF", "Oak", "Actilife"), name = "Algorithm") +
-  scale_y_discrete(labels = c("<18", "19-29", "30-39", "40-49", "50-59", "60-69", "70+")) +
+  scale_color_viridis_d(option ="B", labels = c("ADEPT", "SSL", "Verisense v2", "Verisense", "RF", "Oak", "Actilife"), name = "Algorithm") +
+  scale_y_discrete(labels = c("<19", "19-29", "30-39", "40-49", "50-59", "60-69", "70+")) +
   theme(legend.position = "bottom") + 
   labs(x = "Mean steps per day (x1000)", y = "Age category", title = "Stepping patterns by algorithm and age") +
-  guides(fill = guide_legend(nrow = 1)) 
+  guides(fill = guide_legend(nrow = 1)) +
+  annotate(
+    geom = "text",
+    x = 15000,
+    y = 7.75,
+    label = "Median steps 70+ = 8000",
+    hjust = 0,
+    color = "#444444"
+  )  +
+  geom_segment(
+    aes(
+      xend = m_old,
+      y = 7.75,
+      x = 15000,
+      yend = 7.75
+    ),
+    arrow = arrow(length = unit(0.1, "inches"), type = "closed"),
+    color = "#444444",
+    linewidth = .5
+  ) +
+  annotate(
+    geom = "text",
+    x = 17000,
+    y = 2.5,
+    label = "Median steps 19-29 = 12500",
+    hjust = 0,
+    # fill= "#FCFDBFFF",
+    color = "#444444"
+  )  +
+  geom_segment(
+    aes(
+      xend = m_ya,
+      y = 2.5,
+      x = 17000,
+      yend = 2.5
+    ),
+    arrow = arrow(length = unit(0.1, "inches"), type = "closed"),
+    color = "#444444",
+    linewidth = .5
+  ) 
+
+
 
 ```
 
 ---
 
 ### Open source step counting 
+
+Being in higher step quartile associated with lower adjusted mortality risk
 
 ```{r quartsteps}
 df_mortality =
@@ -2858,7 +2971,7 @@ res %>%
 
 ## Detour through NHANES: survey-weighted functional regression 
 
-Another question motivated by NHANES: how are physical activity patterns associated with covariates like age, sex? 
+Question motivated by NHANES: how are physical activity patterns associated with covariates like age, sex? 
 
 ```{r mims profiles}
 #| cache: true 
@@ -2949,6 +3062,7 @@ df %>%
 
 ### Survey-weighted functional regression 
 But: NHANES is not a simple random sample
+
 Are our estimates valid for population-level inference? 
 
 ```{r fosr compare}
@@ -3263,17 +3377,16 @@ dens_df %>%
 + Mean (SD)  $7 (1.8)$ minutes per patient, range $3$-$16$ minutes
 + Obtain predictors for many different lags and cut points
 + Use predictors that are top 10 contributors to first 30 PCs ($\approx 100$ predictors)
-+ 94\% rank 1, 99\% rank 5 accuracy on test set 
 
 ---
 
 ### Fingerprinting with arterial waveform
 
-```{r}
+```{r xgb accuracy}
+#| cache: true
 mean_preds %>% 
   mutate(correct = 
            if_else(true_subject == model & true_subject %in% correct$true_subject, 1, 0)) %>% 
-  # filter(true_subject %in% 1:200) %>%
   ggplot(aes(x = factor(true_subject), y = mean_pred, color = factor(correct))) + 
   geom_jitter(width = .1, size = .5, alpha = 0.5) +
   theme(legend.position = "bottom",
@@ -3284,9 +3397,21 @@ mean_preds %>%
                      labels = c("No", "Yes"),
                      name = "Correctly Identified") + 
   labs(x = "Patient", y = "Predicted Probability",
-       title = "Predicted Probabilities from XGBoost Model") +
+       title = "Predicted Probabilities from XGBoost Model",
+       subtitle = "94% rank 1, 99% rank 5 accuracy on test set") +
   guides(color = guide_legend(override.aes = list(size = 3, alpha = 1))) +
-  scale_y_continuous(breaks = seq(0, 0.7, 0.1))
+  scale_y_continuous(breaks = seq(0, 0.7, 0.1)) +
+  annotate(geom = "text",
+           color = "#009E73",
+           hjust = 0,
+           label = "Green point above pink points in each column\nindicates correct identification",
+           x = "325", y = 0.6) +
+  geom_segment(xend = "272", x = "325", y = 0.6, yend = 0.6,
+    arrow = arrow(length = unit(0.1, "inches"), type = "closed"),
+    color = "#444444",
+    linewidth = .5)
+
+
 ```
 
 ---
@@ -3298,6 +3423,7 @@ mean_preds %>%
 + Designing real-time interventions based on hemodynamics patterns
 + Extending survey FoSR to longitudinal outcomes 
 + Standardizing processing and analysis pipelines for wearable accelerometry 
+
 :::
 
 
@@ -3305,11 +3431,11 @@ mean_preds %>%
 ## Thank you!
 
 
+<br>
 
-+ Link to slides [https://lilykoff.github.io/job_talk2025](https://lilykoff.github.io/job_talk2025) 
-+ Email [lkoffma2@jh.edu](lkoffma2@jh.edu)
-+ Website: [lilykoff.com](lilykoff.com)
-+ Github: [github.com/lilykoff](github.com/lilykoff)
-
+- Link to slides: [https://lilykoff.github.io/job_talk2025](https://lilykoff.github.io/job_talk2025) 
+- Email: [lkoffma2@jh.edu](lkoffma2@jh.edu)
+- Website: [lilykoff.com](lilykoff.com)
+- Github: [github.com/lilykoff](github.com/lilykoff)
 
 
