@@ -1,6 +1,6 @@
 ---
 title: "Job Talk"
-subtitle: ""
+subtitle: "https://lilykoff.github.io/job_talk2025"
 author: "Lily Koffman"
 format:
   revealjs:
@@ -2651,7 +2651,7 @@ df_fine %>%
 ::: {.incremental}
 
 + National Health and Nutrition Examination Survey (NHANES)
-![](figs/nhanes.png)
+![](figs/nhanes.png){width=50%}
 + Nationally representative survey of US 
 + Free-living accelerometry
 + Physical activity summaries: not interpretable or translatable
@@ -3305,7 +3305,8 @@ mean_preds %>%
 ## Thank you!
 
 
-+ Link to slides 
+
++ Link to slides [https://lilykoff.github.io/job_talk2025](https://lilykoff.github.io/job_talk2025) 
 + Email [lkoffma2@jh.edu](lkoffma2@jh.edu)
 + Website: [lilykoff.com](lilykoff.com)
 + Github: [github.com/lilykoff](github.com/lilykoff)
