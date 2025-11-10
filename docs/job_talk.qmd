@@ -1,6 +1,6 @@
 ---
 title: "Job Talk"
-subtitle: "Faculty Job Talk — Johns Hopkins Biostatistics"
+subtitle: ""
 author: "Lily Koffman"
 format:
   revealjs:
@@ -38,9 +38,87 @@ library(ggrepel)
 library(broom)
 library(survival)
 options(digits.secs = 3)
+
+```
+
+```{r misc functions}
+#| include: false 
+get_summarized_predictions = function(predictions, rank = FALSE, exp = FALSE) {
+  # predictions is tibble
+  # column j is the predictions from fitting the model where the "true subject" is subject j
+  # each row is prediction for a given second
+  # true subject is the final column
+  
+  if (rank) {
+    # will return data frame with columns true subject, model, mean prediction, rank of correct prediction,
+    # and rank1, rank5 which indicate whether predicted subject was in top 1 or top 5
+    cn_new = unique(predictions$true_subject)
+    predictions %>% 
+      magrittr::set_colnames(c(cn_new, "true_subject")) %>% 
+      janitor::clean_names() %>% 
+      mutate(true_subject = as.numeric(true_subject)) %>% 
+      group_by(true_subject) %>%
+      mutate(sec = row_number()) %>%
+      pivot_longer(cols = -c("true_subject", "sec"), names_to = "name", values_to = "pred") %>%
+      mutate(model = as.numeric(sub(".*x", "", name))) %>%
+      select(-name) %>%
+      # now we have the prediction for each second for each model / true subject combo
+      mutate(pred = case_when(exp ~ exp(pred),
+                              .default = pred)) %>% # exponentiate based on exp argument
+      ungroup() %>%
+      group_by(true_subject, model) %>%
+      # get mean probability across seconds for each true subject / model combo
+      summarize(mean_pred = mean(pred, na.rm = TRUE), .groups = "drop") %>%
+      group_by(true_subject) %>%
+      mutate(
+        rank = rank(-mean_pred)
+      ) %>% # get the rank for each prediction
+      ungroup() %>%
+      filter(model == true_subject) %>% # only keep the correct combos and get ranks
+      mutate(
+        rank1 = if_else(rank == 1, 1, 0),
+        rank5 = if_else(rank <= 5, 1, 0)
+      )
+  } else {
+    cn_new = unique(predictions$true_subject)
+    predictions %>% 
+      magrittr::set_colnames(c(cn_new, "true_subject")) %>% 
+      janitor::clean_names() %>% 
+      mutate(true_subject = as.numeric(true_subject))  %>% 
+      group_by(true_subject) %>%
+      mutate(sec = row_number()) %>%
+      pivot_longer(cols = -c("true_subject", "sec"), names_to = "name", values_to = "pred") %>%
+      mutate(model = as.numeric(sub(".*x", "", name))) %>%
+      select(-name) %>%
+      # now we have the prediction for each second for each model / true subject combo
+      mutate(pred = case_when(exp ~ exp(pred),
+                              .default = pred)) %>% # exponentiate based on exp argument
+      ungroup() %>%
+      group_by(true_subject, model) %>%
+      summarize(mean_pred = mean(pred, na.rm = TRUE), .groups = "drop") %>%
+      group_by(true_subject) %>%
+      summarize(
+        maxprob = first(max(mean_pred)),
+        predicted_sub = first(model[mean_pred == maxprob]),
+        probsubj = first(mean_pred[true_subject == model])
+      ) %>%
+      mutate(correct = if_else(as.numeric(predicted_sub) == true_subject, 1, 0)) %>%
+      ungroup()
+  }
+}
+
 range_left = function(x, left, right){
   ifelse(x > left & x <= right, TRUE, FALSE)
 }
+
+get_density = function(x, y, ...) {
+  dens <- MASS::kde2d(x, y, ...)
+  ix <- findInterval(x, dens$x)
+  iy <- findInterval(y, dens$y)
+  ii <- cbind(ix, iy)
+  return(dens$z[ii])
+}
+
 ```
 
 ```{r ggplot theme}
@@ -72,16 +150,10 @@ theme_set(
 scale_color_okabe <- function(...) scale_color_manual(values = okabe_ito, ...)
 scale_fill_okabe  <- function(...) scale_fill_manual(values = okabe_ito, ...)
 
-get_density <- function(x, y, ...) {
-  dens <- MASS::kde2d(x, y, ...)
-  ix <- findInterval(x, dens$x)
-  iy <- findInterval(y, dens$y)
-  ii <- cbind(ix, iy)
-  return(dens$z[ii])
-}
 ```
 
 ```{r data read in and processing}
+# ----- hemodynamics results ----- # 
 hemo_res = read_rds(here::here("docs", "data", "bricks_regressions.rds")) %>% 
   filter(type == "adjusted", outcome == "AKI48") %>% 
   separate_wider_delim(term, delim = "]", names = c("MAP", "CVP", "x")) %>% 
@@ -204,7 +276,7 @@ steps = read_rds(here::here("docs", "data", "covariates_accel_mortality_df.rds")
 pa_data = read_csv(here::here("docs", "data", "82157.csv.gz"),
                               n_max = 80 * 60 * 60 * 24)
 
-hemo_data = read_csv(here::here("docs", "data", "1156602.csv.gz")) %>% 
+hemo_data0 = read_csv(here::here("docs", "data", "1156602.csv.gz")) %>% 
   filter(cat_anes == "intra")
 hemo_data = read_csv(here::here("docs", "data", "1004841.csv.gz")) %>% 
   filter(cat_anes == "intra")
@@ -417,6 +489,39 @@ df_fine = df_fine %>%
   full_join(key, by = c("cell" = "old_names"))
 ```
 
+```{r read in data pt 2}
+#| cache: true
+#| include: false 
+
+
+predictions = read_rds(here::here("docs", "data", "pred_df_xgb_med.rds"))
+
+pred_res = get_summarized_predictions(predictions, rank = TRUE)
+
+cn_new = unique(predictions$true_subject)
+mean_preds = 
+  predictions %>% 
+  magrittr::set_colnames(c(cn_new, "true_subject")) %>% 
+  janitor::clean_names() %>% 
+  mutate(true_subject = as.numeric(true_subject)) %>% 
+  group_by(true_subject) %>%
+  mutate(sec = row_number()) %>%
+  pivot_longer(cols = -c("true_subject", "sec"), names_to = "name", values_to = "pred") %>%
+  mutate(model = as.numeric(sub(".*x", "", name))) %>%
+  select(-name) %>%
+  # now we have the prediction for each second for each model / true subject combo
+  # exponentiate based on exp argument
+  ungroup() %>%
+  group_by(true_subject, model) %>%
+  # get mean probability across seconds for each true subject / model combo
+  summarize(mean_pred = mean(pred, na.rm = TRUE), .groups = "drop")
+
+
+correct = pred_res %>% 
+  filter(rank1 == 1)
+  
+```
+
 ```{r pa_plot}
 #| cache: true
 
@@ -438,8 +543,20 @@ p1 = pa_data %>%
     )
   ) 
 
-p3 = p1 + annotate(geom = "rect", xmin = start, xmax = end, ymin = -Inf, ymax = Inf,
-            fill = "#F0E442", alpha = .5)
+p3 = p1 + annotate(geom = "rect", xmin = start, xmax = end, ymin = -Inf, ymax = Inf, fill = "#D55E00", alpha = .5) +
+  geom_curve(
+    aes(x = start - 1, y = 3, xend = start, yend = 6),
+    arrow = arrow(length = unit(0.25, "inches"), type = "closed"),
+    curvature = 0.3,
+    color = "#444444",
+    linewidth = 1
+  ) +
+  annotate(
+    "text",
+    x = start - 1, y = 4,
+    label = "Highlighted period",
+    hjust = 0, size = 4, color = "#D55E00"
+  )
 
 p2 = pa_data %>% 
   filter(HEADER_TIMESTAMP >= start & HEADER_TIMESTAMP < end) %>%  
@@ -468,7 +585,7 @@ p3 + inset_element(p2, 0.6, 0.6, 1, 1, align_to = "full")
 ---
 
 ```{r hemos plot}
-start = as.POSIXct("2022-08-30 16:00:00", tz = "UTC")
+start = as.POSIXct("2022-08-30 16:30:00", tz = "UTC")
 end = start + as.period(30, "seconds")
 
 p1 = hemo_data %>% 
@@ -490,7 +607,7 @@ p1
 
 ```{r hemos plot with inset}
 p3 = p1 + annotate(geom = "rect", xmin = start, xmax = end, ymax = Inf, ymin = -Inf,
-            fill = "#F0E442", alpha = 0.5)
+            fill = "#D55E00", alpha = 0.5)
 
 
 p2 = hemo_data %>% 
@@ -506,24 +623,152 @@ p3 + inset_element(p2, 0.6, 0.6, 1, 1, align_to = "full")
 
 ```
 
+
 ---
+  
+## Outline 
+  
+```{r outline1}
+timeline = tibble(
+  time = c(1, 3, 5, 7),
+  ypos = c(.4, -.4, .4, -.4),
+  label = c(
+    "Fingerprinting:\nIdentifying people from walking\naccelerometry data",
+    "Step counting:\nalgorithm comparison and\napplication in NHANES",
+    "Survey-weighted FOSR\n(motivated by NHANES)",
+    "Fingerprinting\nwith hemodynamics data"
+  )
+)
 
-## Outline {.smaller}
 
+timeline %>% 
+  ggplot(aes(x = time, y = ypos)) + 
+  geom_segment(data = timeline %>% filter(time == 1),
+               aes(x = time, xend = time, y = 0, yend = ypos),
+               color = "gray40", linewidth = 0.8) +
+  geom_label(data = timeline %>% filter(time == 1),
+             aes(label = label),
+             fill = c("#E69F00"),
+             color = "black", label.size = 0.4, size = 6,
+             label.padding = unit(0.25, "lines"), family = "Source Sans Pro") +
+  geom_segment(
+    aes(x = min(time) - 0.2, xend = max(time) + 0.5, y = 0, yend = 0),
+    arrow = arrow(type = "closed", length = unit(0.25, "inches")),
+    linewidth = 1.4,
+    color = "#444444"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.title = element_blank(),
+    axis.text = element_blank(),
+    axis.ticks = element_blank(),
+    panel.grid = element_blank(),
+    plot.background = element_rect(fill = "#f2ede3", color = NA)
+  )  +
+  coord_cartesian(clip = "off", ylim = c(-1.5, 1.5),
+                  xlim = c(-1, 8))
+```
 
-### Accelerometry data
-- Digital fingerprinting 
-- Open-source step counting 
-- Survey-weighted functional regression
+---
+  
+## Outline
+  
+```{r outline2}
 
-### Hemodynamics data 
-- Fine mapping
-- Digital fingerprinting 
+timeline %>% 
+  ggplot(aes(x = time, y = ypos)) + 
+  geom_segment(data = timeline %>% filter(time %in% c(1, 3)),
+               aes(x = time, xend = time, y = 0, yend = ypos),
+               color = "gray40", linewidth = 0.8) +
+  geom_label(data = timeline %>% filter(time %in% c(1, 3)),
+             aes(label = label),
+             fill =c("#E69F00", "#56B4E9"),
+             color = "black", label.size = 0.4, size = 6,
+             label.padding = unit(0.25, "lines"), family = "Source Sans Pro") +
+  geom_segment(
+    aes(x = min(time) - 0.2, xend = max(time) + 0.5, y = 0, yend = 0),
+    arrow = arrow(type = "closed", length = unit(0.25, "inches")),
+    linewidth = 1.4,
+    color = "#444444"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.title = element_blank(),
+    axis.text = element_blank(),
+    axis.ticks = element_blank(),
+    panel.grid = element_blank(),
+    plot.background = element_rect(fill = "#f2ede3", color = NA)
+  )  +
+  coord_cartesian(clip = "off", ylim = c(-1.5, 1.5),
+                  xlim = c(-1, 8))
+```
 
-### Future Directions
-- Open-source tools for wearable data  
-- Collaboration opportunities  
-- Broader impact and teaching
+---
+  
+## Outline 
+  
+  
+```{r outline3}
+
+timeline %>% 
+  ggplot(aes(x = time, y = ypos)) + 
+  geom_segment(data = timeline %>% filter(time %in% c(1, 3, 5)),
+               aes(x = time, xend = time, y = 0, yend = ypos),
+               color = "gray40", linewidth = 0.8) +
+  geom_label(data = timeline %>% filter(time %in% c(1, 3, 5)),
+             aes(label = label),
+             fill = c("#E69F00", "#56B4E9", "#009E73"),
+             color = "black", label.size = 0.4, size = 6,
+             label.padding = unit(0.25, "lines"), family = "Source Sans Pro") +
+  geom_segment(
+    aes(x = min(time) - 0.2, xend = max(time) + 0.5, y = 0, yend = 0),
+    arrow = arrow(type = "closed", length = unit(0.25, "inches")),
+    linewidth = 1.4,
+    color = "#444444"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.title = element_blank(),
+    axis.text = element_blank(),
+    axis.ticks = element_blank(),
+    panel.grid = element_blank(),
+    plot.background = element_rect(fill = "#f2ede3", color = NA)
+  )  +
+  coord_cartesian(clip = "off", ylim = c(-1.5, 1.5),
+                  xlim = c(-1, 8))
+```
+
+---
+  
+## Outline 
+  
+```{r outline4}
+
+timeline %>% 
+  ggplot(aes(x = time, y = ypos)) + 
+  geom_segment(aes(x = time, xend = time, y = 0, yend = ypos),
+               color = "gray40", linewidth = 0.8) +
+  geom_label(aes(label = label),
+             fill = c("#E69F00", "#56B4E9", "#009E73", "#CC79A7"),    
+             color = "black", label.size = 0.4, size = 6,
+             label.padding = unit(0.25, "lines"), family = "Source Sans Pro") +
+  geom_segment(
+    aes(x = min(time) - 0.2, xend = max(time) + 0.5, y = 0, yend = 0),
+    arrow = arrow(type = "closed", length = unit(0.25, "inches")),
+    linewidth = 1.4,
+    color = "#444444"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.title = element_blank(),
+    axis.text = element_blank(),
+    axis.ticks = element_blank(),
+    panel.grid = element_blank(),
+    plot.background = element_rect(fill = "#f2ede3", color = NA)
+  )  +
+  coord_cartesian(clip = "off", ylim = c(-1.5, 1.5),
+                  xlim = c(-1, 8))
+```
 
 ---
 
@@ -603,24 +848,15 @@ p1 + p2
 
 ---
 
+## Digital fingerprinting with accelerometry data
+
 ```{r fingerprint answer}
 p1 + p3
 ```
 
 ---
 
-```{r}
-# relevance - why do we care? 
-# accelerometry time series --> scalar predictors 
-# fingerprints and application in NHANES - mention R project 
-# future directions
-# aside - open source step counting? 
-# digital fingerprinting 
-# step 1: understand data, "fine mapping approach" 
-# next: going back to raw data, what can the ABP waveform tell us? 
-```
-
-#### Big picture: time series to scalar predictors
+### Big picture method: time series to scalar predictors
 
 ```{r def arrow}
 arrow_plot = ggplot() +
@@ -724,6 +960,8 @@ p1 + arrow_plot + p2 + plot_layout(ncol = 3, widths = c(1, 0.2, 1))
 
 ---
 
+### Each row in X is a second of data
+
 ```{r x plot updated}
 p1a = 
   p1 + 
@@ -825,6 +1063,9 @@ p1a + arrow_plot + p3 + plot_layout(ncol = 3, widths = c(1, 0.2, 1))
 ```
 
 ---
+
+### Fit n regression models (one vs. rest)
+
 
 ```{r y matrix}
 n_cols = 1
@@ -950,11 +1191,15 @@ p6 = pred_matrix %>%
 
 ---
 
+### Fit n regression models (one vs. rest)
+
 ```{r ovr model 2}
  p5 + p3 + plot_layout(ncol = 2, widths = c(0.3, 1)) + plot_annotation(title = "Model 2")
 ```
 
 ---
+
+### Fit n regression models (one vs. rest)
 
 ```{r ovr model 3}
  p6 + p3 + plot_layout(ncol = 2, widths = c(0.3, 1)) + plot_annotation(title = "Model 3")
@@ -962,7 +1207,10 @@ p6 = pred_matrix %>%
 
 ---
 
-#### Details 
+### Details of the method
+
+::: {.incremental}
+
 **For each second and each person**: 
 
 + Obtain joint distribution of acceleration and lag acceleration for a series of lags 
@@ -973,6 +1221,8 @@ p6 = pred_matrix %>%
   
 + We walk through the process for one second, person, and lag to illustrate the process
   
+::: 
+
 --- 
 
 #### Obtain joint distribution of acceleration and lag acceleration 
@@ -2077,18 +2327,19 @@ p4 + p3n + plot_layout(ncol = 2, widths = c(0.3, 1))
 
 ---
 
-#### Fit models
+### Fit models
+
 ::: {.incremental}
 + $n$ models, one for each person 
 + Model $j$ predicts probability that second $i$ is from person $j$ 
 + Max prediction across all models is the predicted person for that second 
 + Models include: logistic regression w/ variable selection, lasso, random forest, XGBoost, etc. 
 
-::: {.incremental}
+:::
 
 ---
 
-#### Detour: functional regression approach 
+### Aside: functional regression approach 
 
 
 ![](figs/test1.png)
@@ -2099,7 +2350,7 @@ Hat tip to [Edward Gunning](https://edwardgunning.github.io/) for the idea for t
 
 ---
 
-#### Detour: functional regression approach 
+### Aside: functional regression approach 
 
 ![](figs/test2.png)
 
@@ -2108,7 +2359,7 @@ Hat tip to [Edward Gunning](https://edwardgunning.github.io/) for the idea for t
 :::
 ---
 
-#### Detour: functional regression approach 
+### Aside: functional regression approach 
 
 ![](figs/test3.png)
 
@@ -2117,7 +2368,7 @@ Hat tip to [Edward Gunning](https://edwardgunning.github.io/) for the idea for t
 :::
 ---
 
-#### Detour: functional regression approach 
+### Aside: functional regression approach 
  
 ![](figs/test4.png)
 
@@ -2127,7 +2378,7 @@ Hat tip to [Edward Gunning](https://edwardgunning.github.io/) for the idea for t
 
 ---
 
-#### Detour: functional regression approach 
+### Aside: functional regression approach 
  
 ![](figs/test4.png)
 
@@ -2145,7 +2396,7 @@ Hat tip to [Edward Gunning](https://edwardgunning.github.io/) for the idea for t
 
 ---
 
-#### "Fingerprints" summarize predictors for a given lag and are different across individuals
+### "Fingerprints" summarize predictors for a given lag and are different across individuals
 
 ```{r fprints 3}
 s1_dens = 
@@ -2174,7 +2425,7 @@ s1_dens %>% mutate(id = "Person A") %>%
 
 ---
 
-#### "Fingerprints" summarize predictors for a given lag and are different across individuals
+### "Fingerprints" summarize predictors for a given lag and are different across individuals
 
 
 ::: {layout-nrow=2}
@@ -2190,7 +2441,7 @@ s1_dens %>% mutate(id = "Person A") %>%
 
 ----
 
-#### The method works! 
+### The method works! 
 
 ::: {.incremental}
 + Applied to three datasets 
@@ -2370,7 +2621,7 @@ result_df %>%
 ---
 
 
-#### So what? 
+### So what? 
 
 ```{r image on scalar}
 df_fine %>%
@@ -2395,11 +2646,12 @@ df_fine %>%
 
 ---
 
-### Detour through NHANES: open source step counting
+
+## Detour through NHANES: open source step counting
 ::: {.incremental}
 
 + National Health and Nutrition Examination Survey (NHANES)
-![](docs/figs/nhanes.png)
+![](figs/nhanes.png)
 + Nationally representative survey of US 
 + Free-living accelerometry
 + Physical activity summaries: not interpretable or translatable
@@ -2410,7 +2662,7 @@ df_fine %>%
 
 ---
 
-### Detour through NHANES: open source step counting
+### Open source step counting
 
 ```{r ridges1}
 steps %>% 
@@ -2437,7 +2689,7 @@ steps %>%
 
 ---
 
-### Detour through NHANES: open source step counting
+### Open source step counting
 
 ```{r ridges 2}
 # steps %>% 
@@ -2485,7 +2737,7 @@ steps %>%
 
 ---
 
-#### Detour through NHANES: open source step counting 
+### Open source step counting 
 
 ```{r quartsteps}
 df_mortality =
@@ -2604,12 +2856,12 @@ res %>%
 
 ---
 
-### Detour through NHANES: survey-weighted functional regression 
+## Detour through NHANES: survey-weighted functional regression 
 
 Another question motivated by NHANES: how are physical activity patterns associated with covariates like age, sex? 
 
 ```{r mims profiles}
-
+#| cache: true 
 pa_long = 
   pa_df %>% 
   select(gender, SEQN, age = age_in_years_at_screening, starts_with("min")) %>% 
@@ -2639,7 +2891,7 @@ pa_long %>%
 
 ---
 
-### Detour through NHANES: survey-weighted functional regression 
+### Survey-weighted functional regression 
 
 We can answer this question with function on scalar regression (FoSR): 
 
@@ -2695,7 +2947,7 @@ df %>%
 
 ---
 
-### Detour through NHANES: survey-weighted functional regression 
+### Survey-weighted functional regression 
 But: NHANES is not a simple random sample
 Are our estimates valid for population-level inference? 
 
@@ -2730,7 +2982,7 @@ df2 %>%
 
 ---
 
-### Detour through NHANES: survey-weighted functional regression 
+### Survey-weighted functional regression 
 
 $\texttt{svyfosr}$: first survey-weighted functional regression implementation in R 
 
@@ -2756,7 +3008,7 @@ df2 %>%
 
 ## Digital fingerprinting with hemodynamics data 
 
-#### Preliminary hemodynamics work
+### Preliminary hemodynamics work
 Coarse literature targets for MAP and CVP
 
 
@@ -2776,7 +3028,7 @@ hemo_ts_plotdf %>%
 
 ---
 
-#### Preliminary hemodynamics work
+### Preliminary hemodynamics work
 MAP and CVP are not independent; they occur simultaneously
 
 ```{r heatmap}
@@ -2797,7 +3049,7 @@ hemo_res %>%
 
 ---
 
-#### Preliminary hemodynamics work
+### Preliminary hemodynamics work
 MAP and CVP are not independent; they occur simultaneously
 
 ```{r zone plot}
@@ -2840,7 +3092,7 @@ plotdf %>%
 
 ---
 
-#### Preliminary hemodynamics work
+### Preliminary hemodynamics work
 MAP and CVP are not independent; they occur simultaneously
 
 ```{r plot new values}
@@ -2858,7 +3110,8 @@ hemo_ts_plotdf  %>%
 
 ---
 
-#### Preliminary hemodynamics work
+### Preliminary hemodynamics work
+
 MAP and CVP are not independent; they occur simultaneously
 
 ```{r how did things change}
@@ -2869,9 +3122,193 @@ hemo_ts_plotdf %>%
   # geom_line() + 
   labs(x = "Time since start of surgery (hours)", y = "Hemodynamic Value") +
   theme(legend.position = "bottom") +
-  scale_color_manual(values = c("#5D82F0", "#FF4D4D", "darkgrey"),
+  scale_color_manual(values = c("darkgrey", "#FF4D4D"),
                      name = "Change with our analysis")
 
 
 ```
+
+---
+
+### Fingerprinting with arterial waveform 
+
+```{r fprint waveform1}
+
+x = hemo_data %>%
+  filter(cat_cpb %in% c("pre", "post") & cat_anes == "intra") %>%
+  mutate(time = floor_date(time, unit = "seconds"))
+
+seconds = unique(x$time)
+set.seed(123)
+sec_sample = sample(seconds, 10 * 60, replace = FALSE)
+dens_df =
+ x %>% 
+ filter(time %in% sec_sample) %>% 
+ mutate(cat_cpb = factor(cat_cpb, labels = c("Post-CPB", "Pre-CPB")),
+        cat_cpb = forcats::fct_rev(cat_cpb)) %>% 
+ group_by(time, cat_cpb) %>%
+ mutate(lag_abp = lag(abp, n = 18)) %>%
+ ungroup()  %>%
+ drop_na()
+
+dens_df$density = get_density(dens_df$abp, dens_df$lag_abp, n = 120 - 18)
+  
+dens_df2 =
+ x %>% 
+ filter(time %in% sec_sample) %>% 
+ mutate(cat_cpb = factor(cat_cpb, labels = c("Post-CPB", "Pre-CPB")),
+        cat_cpb = forcats::fct_rev(cat_cpb)) %>% 
+ group_by(time, cat_cpb) %>%
+ mutate(lag_abp = lag(abp, n = 36)) %>%
+ ungroup()  %>%
+ drop_na()
+
+dens_df2$density = get_density(dens_df2$abp, dens_df2$lag_abp, n = 120 - 36)
+
+dens_df3 =
+ x %>% 
+ filter(time %in% sec_sample) %>% 
+ mutate(cat_cpb = factor(cat_cpb, labels = c("Post-CPB", "Pre-CPB")),
+        cat_cpb = forcats::fct_rev(cat_cpb)) %>% 
+ group_by(time, cat_cpb) %>%
+ mutate(lag_abp = lag(abp, n = 54)) %>%
+ ungroup()  %>%
+ drop_na()
+
+dens_df3$density = get_density(dens_df3$abp, dens_df3$lag_abp, n = 120 - 54)
+  
+dens_df %>% 
+  mutate(lag = "0.15s") %>% 
+  bind_rows(dens_df2 %>% mutate(lag = "0.30s")) %>% 
+  bind_rows(dens_df3 %>% mutate(lag = "0.45s")) %>% 
+  ggplot(aes(x=abp, y = lag_abp, group = time, color = density)) +
+  facet_grid(lag~cat_cpb) +
+  geom_point(size = .5, alpha = .1) +
+  scale_color_viridis(name = "# points", option = "B") +
+  labs(x = "ABP (mmHg)", y = "Lag ABP (mmHg)", title = "Fingerprint, subject 1", subtitle = "10 minutes of data") +
+  scale_x_continuous(limits = c(40, 150)) +
+  scale_y_continuous(limits = c(40,150)) 
+  
+```
+
+---
+
+### Fingerprinting with arterial waveform 
+
+
+
+```{r fprint waveform2}
+x = hemo_data0 %>%
+  filter(cat_cpb %in% c("pre", "post") & cat_anes == "intra") %>%
+  mutate(time = floor_date(time, unit = "seconds"))
+
+seconds = unique(x$time)
+set.seed(123)
+sec_sample = sample(seconds, 10 * 60, replace = FALSE)
+dens_df =
+ x %>% 
+ filter(time %in% sec_sample) %>% 
+ mutate(cat_cpb = factor(cat_cpb, labels = c("Post-CPB", "Pre-CPB")),
+        cat_cpb = forcats::fct_rev(cat_cpb)) %>% 
+ group_by(time, cat_cpb) %>%
+ mutate(lag_abp = lag(abp, n = 18)) %>%
+ ungroup()  %>%
+ drop_na()
+
+dens_df$density = get_density(dens_df$abp, dens_df$lag_abp, n = 120 - 18)
+  
+dens_df2 =
+ x %>% 
+ filter(time %in% sec_sample) %>% 
+ mutate(cat_cpb = factor(cat_cpb, labels = c("Post-CPB", "Pre-CPB")),
+        cat_cpb = forcats::fct_rev(cat_cpb)) %>% 
+ group_by(time, cat_cpb) %>%
+ mutate(lag_abp = lag(abp, n = 36)) %>%
+ ungroup()  %>%
+ drop_na()
+
+dens_df2$density = get_density(dens_df2$abp, dens_df2$lag_abp, n = 120 - 36)
+
+dens_df3 =
+ x %>% 
+ filter(time %in% sec_sample) %>% 
+ mutate(cat_cpb = factor(cat_cpb, labels = c("Post-CPB", "Pre-CPB")),
+        cat_cpb = forcats::fct_rev(cat_cpb)) %>% 
+ group_by(time, cat_cpb) %>%
+ mutate(lag_abp = lag(abp, n = 54)) %>%
+ ungroup()  %>%
+ drop_na()
+
+dens_df3$density = get_density(dens_df3$abp, dens_df3$lag_abp, n = 120 - 54)
+  
+dens_df %>% 
+  mutate(lag = "0.15s") %>% 
+  bind_rows(dens_df2 %>% mutate(lag = "0.30s")) %>% 
+  bind_rows(dens_df3 %>% mutate(lag = "0.45s")) %>% 
+  ggplot(aes(x=abp, y = lag_abp, group = time, color = density)) +
+  facet_grid(lag~cat_cpb) +
+  geom_point(size = .5, alpha = .1) +
+  scale_color_viridis(name = "# points", option = "B") +
+  labs(x = "ABP (mmHg)", y = "Lag ABP (mmHg)", title = "Fingerprint, subject 2", subtitle = "10 minutes of data") +
+  scale_x_continuous(limits = c(40, 150)) +
+  scale_y_continuous(limits = c(40, 150))
+  
+```
+
+---
+
+### Fingerprinting with arterial waveform
+
++ Fit XGBoost model on 727 patients
++ Mean (SD)  $7 (1.8)$ minutes per patient, range $3$-$16$ minutes
++ Obtain predictors for many different lags and cut points
++ Use predictors that are top 10 contributors to first 30 PCs ($\approx 100$ predictors)
++ 94\% rank 1, 99\% rank 5 accuracy on test set 
+
+---
+
+### Fingerprinting with arterial waveform
+
+```{r}
+mean_preds %>% 
+  mutate(correct = 
+           if_else(true_subject == model & true_subject %in% correct$true_subject, 1, 0)) %>% 
+  # filter(true_subject %in% 1:200) %>%
+  ggplot(aes(x = factor(true_subject), y = mean_pred, color = factor(correct))) + 
+  geom_jitter(width = .1, size = .5, alpha = 0.5) +
+  theme(legend.position = "bottom",
+        axis.text.x = element_blank(),
+        panel.grid.major.x = element_blank(),
+        panel.grid.minor.x = element_blank()) +
+  scale_color_manual(values = c("#CC79A7", "#009E73"),
+                     labels = c("No", "Yes"),
+                     name = "Correctly Identified") + 
+  labs(x = "Patient", y = "Predicted Probability",
+       title = "Predicted Probabilities from XGBoost Model") +
+  guides(color = guide_legend(override.aes = list(size = 3, alpha = 1))) +
+  scale_y_continuous(breaks = seq(0, 0.7, 0.1))
+```
+
+---
+
+## Future Directions 
+
+::: {.incremental}
++ Using changes in fingerprint (both walking and waveform) to predict changes in function
++ Designing real-time interventions based on hemodynamics patterns
++ Extending survey FoSR to longitudinal outcomes 
++ Standardizing processing and analysis pipelines for wearable accelerometry 
+:::
+
+
+
+## Thank you!
+
+
++ Link to slides 
++ Email [lkoffma2@jh.edu](lkoffma2@jh.edu)
++ Website: [lilykoff.com](lilykoff.com)
++ Github: [github.com/lilykoff](github.com/lilykoff)
+
+
 
