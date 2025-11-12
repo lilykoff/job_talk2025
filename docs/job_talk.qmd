@@ -343,7 +343,15 @@ p3 =
 
 
 
-img_plot + (p1 / p2 / p3 + plot_layout(guides = "collect", axes = "collect"))
+plot_grid(img_plot, NULL, align = "v", rel_widths = c(1,1), ncol = 2)
+```
+
+## Introduction: accelerometry data 
+
+```{r}
+p1a = p1 / p2 / p3 + plot_layout(guides = "collect", axes = "collect")
+
+plot_grid(img_plot, p1a, align = "v", rel_widths = c(1,1), ncol = 2)
 ```
 
 ## Introduction: **big** accelerometry data 
@@ -672,7 +680,9 @@ plot_grid(p1, p2a, ncol = 2, align = "v", rel_widths = c(1,1))
 
 + Calculate scalar summaries of the joint distribution 
   
-+ We walk through the process for one second, person, and lag to illustrate the process
++ I will walk through the process for one second, one person, and one lag  
+
++ Intuition: walking is cyclic process. We want to leverage cyclic nature of walking.
   
 ::: 
 
@@ -1750,6 +1760,9 @@ pred_df %>%
 
 ### Why not use the entire joint distribution? 
 
+---
+
+### Why not use the entire joint distribution? 
 #### Functional regression approach 
 
 
@@ -1828,6 +1841,29 @@ Hat tip to [Edward Gunning](https://edwardgunning.github.io/) for the idea for t
 :::
 
 ::: {.column width="45%"}
+
+:::
+::::
+
+<div style=" position: absolute; bottom: 1em; right: -4em; font-size: 0.7em; color: #777; "> @Koffman2024 </div>
+
+---
+
+
+
+### Why not use fancier models? 
+
+:::: {.columns}
+
+::: {.column width="55%"}
+
+
+![](figs/forest.png){width=50%}
+
+![](figs/rocket2.png){width=50%}
+:::
+
+::: {.column width="45%"}
 Rank-1 (rank-5) % accuracies 
 
 153 person dataset
@@ -1839,7 +1875,7 @@ Two sessions at least 1 week apart
 + Train and test on session 1
   + Logistic regression: 92 (97) 
   + Machine learning: 93 (99)
-  + <span style="color:#009E73;">Functional regression: 98 (100)\%</span>
+  + <span style="color:#009E73;">Functional regression: 98 (100)</span>
 
 + Train on session 1, test on session 2 
   + Logistic regression: 41 (75)
@@ -2134,7 +2170,7 @@ $s \in \{1, \dots, 1440\}$: each minute of the day
 
 Fit separate GLM at each point $s$ and smooth the resulting point estimates to get estimated effect of age, sex on steps profile
 
-
+Bootstrap subjects to get confidence bands 
 
 ---
 
@@ -2149,6 +2185,8 @@ $s \in \{1, \dots, 1440\}$: each minute of the day
 
 Fit separate GLM at each point $s$ and smooth the resulting point estimates to get estimated effect of age, sex on steps profile
 
+Bootstrap subjects to get confidence bands 
+
 <br>
 <span style="color:red;">BUT: NHANES is not a simple random sample</span>
 
@@ -2159,6 +2197,63 @@ Fit separate GLM at each point $s$ and smooth the resulting point estimates to g
 Are our estimates valid for population-level inference? 
 
 ---
+
+
+### Function on scalar regression 
+
+Implementation: Fast univariate inference (FUI) @Cui2021
+$$\mathbb{E}[\mathrm{steps}_i(s)] = \beta_0(s) + \beta_1(s)\mathrm{gender}_i + \beta_2(s)\mathrm{age}_i $$ 
+
+$i$: participant
+
+$s \in \{1, \dots, 1440\}$: each minute of the day
+
+Fit separate GLM at each point $s$ and smooth the resulting point estimates to get estimated effect of age, sex on steps profile
+
+Bootstrap subjects to get confidence bands 
+
+<br>
+<span style="color:red;">BUT: NHANES is not a simple random sample</span>
+
++ Individuals are sampled in geographic clusters
+
++ Minority groups are oversampled 
+
+Are our estimates valid for population-level inference? 
+
+For standard regression: $\texttt{svyglm}$, $\texttt{svycoxph}$
+---
+
+
+
+### Function on scalar regression 
+
+Implementation: Fast univariate inference (FUI) @Cui2021
+$$\mathbb{E}[\mathrm{steps}_i(s)] = \beta_0(s) + \beta_1(s)\mathrm{gender}_i + \beta_2(s)\mathrm{age}_i $$ 
+
+$i$: participant
+
+$s \in \{1, \dots, 1440\}$: each minute of the day
+
+Fit separate GLM at each point $s$ and smooth the resulting point estimates to get estimated effect of age, sex on steps profile
+
+Bootstrap subjects to get confidence bands 
+
+<br>
+<span style="color:red;">BUT: NHANES is not a simple random sample</span>
+
++ Individuals are sampled in geographic clusters
+
++ Minority groups are oversampled 
+
+Are our estimates valid for population-level inference? 
+
+For standard regression: $\texttt{svyglm}$, $\texttt{svycoxph}$
+
+For functional regression: ? 
+---
+
+
 
 ### Complex survey function on scalar regression: simulation
 
@@ -2248,6 +2343,22 @@ model_fit = svyfosr::svyfui(steps_mat ~ age + gender,
 
 </div>
 <div style=" position: absolute; bottom: 0.5em; right: -4em; font-size: 0.7em; color: #777; "> @svy_package </div>
+
+---
+
+### Complex survey function on scalar regression: application
+
+$$\mathbb{E}[\mathrm{steps}_i(s)] = \beta_0(s) + \beta_1(s)\mathrm{gender}_i + \beta_2(s)\mathrm{age}_i $$ 
+
+$i$: participant
+
+$s \in \{1, \dots, 1440\}$: each minute of the day
+
+$\beta_0(s)$: mean steps over the course of the day taken for males age 0
+
+
+$\beta_1(s)$: how many additional steps do females take compared to males, over the course of the day, controlling for age? 
+
 
 ---
 
@@ -2343,8 +2454,10 @@ $\rightarrow$ Yes!
 
 ### Digital fingerprinting in NHANES 
 
+- Use highly specific method to identify walking in NHANES (minimize false positives) @Karas2019
 - $N = 13{,}000$ individuals with 3 minutes walking per person 
 - 3:1 train/test split 
+- Logistic regression + weighting to overcome class imbalance
 - 43\% rank-1 accuracy 
 - 73\% rank-5 accuracy
 - 97\% rank-1\% accuracy (correct subject is in the top 130 predictions)
@@ -2519,9 +2632,10 @@ p0 =
   mutate(floor_sec = floor(relative_time_sec)) %>% 
   filter(floor_sec >= start & floor_sec < start + 10) %>% 
   ggplot(aes(x = relative_time_sec, y = abp)) +
-  geom_line() +
+  geom_line(linewidth = 1.1) +
   scale_x_continuous(breaks = seq(start, start + 10, 1),
                      labels = seq(0, 10, 1)) +
+  scale_y_continuous(limits=c(48, 120), breaks=seq(50,120,10)) +
   labs(x = "Time (s)", y = "Arterial Blood Pressure",
        title = "10s of Arterial Waveform", 
        subtitle = "Patient 1")
@@ -2531,9 +2645,10 @@ p1 =
   mutate(floor_sec = floor(relative_time_sec)) %>% 
   filter(floor_sec >= start & floor_sec < start + 10) %>% 
   ggplot(aes(x = relative_time_sec, y = abp)) +
-  geom_line() +
+  geom_line(linewidth = 1.1) +
   scale_x_continuous(breaks = seq(start, start + 10, 1),
                      labels = seq(0, 10, 1)) +
+    scale_y_continuous(limits=c(48, 120), breaks=seq(50,120,10)) +
   labs(x = "Time (s)", y = "Arterial Blood Pressure",
        title = "10s of Arterial Waveform", 
        subtitle = "Patient 2")
@@ -2671,10 +2786,11 @@ pt1 + pt2
 
 ### Fingerprinting with arterial waveform
 
-+ Fit XGBoost model on 727 patients
-+ Mean (SD)  $7 (1.8)$ minutes per patient, range $3$-$16$ minutes
 + Obtain predictors for many different lags and cut points
 + Use predictors that are top 10 contributors to first 30 PCs ($\approx 100$ predictors)
++ Fit XGBoost model on 727 patients
++ Mean (SD)  $7 (1.8)$ minutes per patient, range $3$-$16$ minutes
+
 
 ---
 
