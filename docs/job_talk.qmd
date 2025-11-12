@@ -112,7 +112,7 @@ cooking = read_rds(here::here("docs", "data", "cooking.rds"))
 pred_df = read_rds(here::here("docs", "data", "paper1_preds.rds"))
 
 # --- step comparison results --- # 
-step_acc = read_rds(here::here("docs", "data", "accuracy_stats_bysubject_redone.rds"))
+step_acc = read_rds(here::here("docs", "data", "step_stats_bysubject.rds"))
 step_res = read_rds(here::here("docs", "data", "total_steps_bysubject_redone.rds"))
 
 # --- nhanes step estimates --- # 
@@ -315,7 +315,7 @@ p1 =
   ggplot(aes(x = t, y = vm))+
   geom_line(linewidth = 0.9, color = "#0072B2")+
   theme(panel.grid.minor = element_blank()) +
-  labs(x = "Time (s)", y = "Acceleration (g)") + 
+  labs(x = "Time (s)", y = "Acceleration (g = 9.81m/s²)") +
   scale_x_continuous(breaks=seq(0,10,1)) +
   scale_y_continuous(limits = c(0.5, 1.75)) + 
   annotate(geom = "label", x = 5, y = 1.5, label = "Driving (passenger)", size = 8, color = "#0072B2")
@@ -325,7 +325,7 @@ p2 =
   ggplot(aes(x = t, y = vm))+
   geom_line(linewidth = 0.9, color = "#009E73")+
   theme(panel.grid.minor = element_blank()) +
-  labs(x = "Time (s)", y = "Acceleration (g)") + 
+  labs(x = "Time (s)", y = "Acceleration (g = 9.81m/s²)") +
   scale_x_continuous(breaks=seq(0,10,1)) +
   scale_y_continuous(limits = c(0.5, 1.75)) +
   annotate(geom = "label", x = 5, y = 1.5, label = "Cooking", size = 8, color = "#009E73")
@@ -336,7 +336,7 @@ p3 =
   ggplot(aes(x = t, y = vm))+
   geom_line(linewidth = 0.9, color = "#CC79A7")+
   theme(panel.grid.minor = element_blank()) +
-  labs(x = "Time (s)", y = "Acceleration (g)") + 
+  labs(x = "Time (s)", y = "Acceleration (g = 9.81m/s²)") +
   scale_x_continuous(breaks = seq(0,10,1)) + 
   scale_y_continuous(limits = c(0.5, 1.75)) +
   annotate(geom = "label", x = 5, y = 1.5, label = "Walking", size = 8, color = "#CC79A7")
@@ -348,7 +348,7 @@ plot_grid(img_plot, NULL, align = "v", rel_widths = c(1,1), ncol = 2)
 
 ## Introduction: accelerometry data 
 
-```{r}
+```{r accel plot w fig}
 p1a = p1 / p2 / p3 + plot_layout(guides = "collect", axes = "collect")
 
 plot_grid(img_plot, p1a, align = "v", rel_widths = c(1,1), ncol = 2)
@@ -1737,7 +1737,7 @@ pred_df %>%
         panel.grid.minor.x = element_blank()) +
   scale_color_manual(values = c("#CC79A7", "#009E73"),
                      labels = c("No", "Yes"),
-                     name = "Correctly Participant") + 
+                     name = "Correct Participant") + 
   labs(x = "Participant", y = "Predicted Probability",
        title = "100% rank-1 accuracy in 32 participants") +
   guides(color = guide_legend(override.aes = list(size = 3, alpha = 1))) +
@@ -1808,11 +1808,159 @@ Hat tip to [Edward Gunning](https://edwardgunning.github.io/) for the idea for t
 
 ---
 
-### Why not use the entire joint distribution? 
+### Functional regression approach 
+<div style="font-size: 80%;">
 
-#### Functional regression approach 
- 
-![](figs/test4.png)
+**Toy example**: 4 observations per second, 2 seconds, 1 individual
+
+$v_1(2)$: 2nd acceleration observation in second 1
+
+data
+$$\begin{bmatrix} v_1(1) & v_1(2) & v_1(3) & v_1(4) \\
+v_2(1) & v_2(2) & v_2(3) & v_2(4) \\
+\end{bmatrix}
+$$ 
+</div>
+
+---
+
+
+### Functional regression approach 
+<div style="font-size: 80%;">
+
+**Toy example**: 4 observations per second, 2 seconds, 1 individual
+
+$v_1(2)$: 2nd acceleration observation in second 1
+
+data $$\begin{bmatrix} v_1(1) & v_1(2) & v_1(3) & v_1(4) \\
+v_2(1) & v_2(2) & v_2(3) & v_2(4) \\
+\end{bmatrix}
+$$ 
+
+acceleration matrix $$\begin{bmatrix} v_1(2) & v_1(3) & v_1(4) & v_1(3) & v_1(4) & v_1(4) \\
+v_2(2) & v_2(3) & v_2(4) & v_2(3) & v_2(4) & v_2(4)  \\
+\end{bmatrix}
+$$ 
+</div>
+
+---
+
+### Functional regression approach 
+
+<div style="font-size: 80%;">
+
+**Toy example**: 4 observations per second, 2 seconds, 1 individual
+
+$v_1(2)$: 2nd acceleration observation in second 1
+
+data $$\begin{bmatrix} v_1(1) & v_1(2) & v_1(3) & v_1(4) \\
+v_2(1) & v_2(2) & v_2(3) & v_2(4) \\
+\end{bmatrix}
+$$ 
+
+
+acceleration matrix $$\begin{bmatrix} v_1(2) & v_1(3) & v_1(4) & v_1(3) & v_1(4) & v_1(4) \\
+v_2(2) & v_2(3) & v_2(4) & v_2(3) & v_2(4) & v_2(4)  \\
+\end{bmatrix}
+$$ 
+lag acceleration matrix $$\begin{bmatrix} v_1(1) & v_1(1) & v_1(1) & v_1(2) & v_1(2) & v_1(3) \\
+v_2(1) & v_2(1) & v_2(1) & v_2(2) & v_2(2) & v_2(3) \\
+\end{bmatrix}
+$$ 
+
+</div>
+---
+
+
+
+### Functional regression approach
+
+<div style="font-size: 80%;">
+
+**Toy example**: 4 observations per second, 2 seconds, 1 individual
+
+$v_1(2)$: 2nd acceleration observation in second 1
+
+data
+$$\begin{bmatrix} v_1(1) & v_1(2) & v_1(3) & v_1(4) \\
+v_2(1) & v_2(2) & v_2(3) & v_2(4) \\
+\end{bmatrix}
+$$ 
+
+
+acceleration matrix $$\begin{bmatrix} v_1(2) & v_1(3) & v_1(4) & v_1(3) & v_1(4) & v_1(4) \\
+v_2(2) & v_2(3) & v_2(4) & v_2(3) & v_2(4) & v_2(4)  \\
+\end{bmatrix}
+$$ 
+lag acceleration matrix $$\begin{bmatrix} v_1(1) & v_1(1) & v_1(1) & v_1(2) & v_1(2) & v_1(3) \\
+v_2(1) & v_2(1) & v_2(1) & v_2(2) & v_2(2) & v_2(3) \\
+\end{bmatrix}
+$$ 
+
+lag matrix $$\begin{bmatrix} 1 & 2 & 3 & 1 & 2 & 1\\
+1 & 2 & 3 & 1 & 2 & 1\\\end{bmatrix}
+$$ 
+</div>
+
+---
+
+
+### Functional regression approach 
+<div style="font-size: 95%;">
+
+Model outcomes as: 
+
+$$Y_{ij}^{i_0}\sim\text{Bernoulli}(p_{ij}^{i_0})$$
+
+where $Y_{ij}^{i_0} = 1$ if subject $i$ in second $j$ belongs to subject $i_0$, and 0 otherwise
+
+</div>
+---
+
+### Functional regression approach 
+
+<div style="font-size: 95%;">
+
+Model outcomes as: 
+
+$$Y_{ij}^{i_0}\sim\text{Bernoulli}(p_{ij}^{i_0})$$
+
+where $Y_{ij}^{i_0} = 1$ if subject $i$ in second $j$ belongs to subject $i_0$, and 0 otherwise
+
+Model: 
+
+$$\text{logit}(p_{ij}^{i_0}) =\beta_0^{i_0} + \int_{u=1}^S\int_{s=u}^SF_{i_0}\{ v_{ij}(s), v_{ij}(s-u), u\}dsdu $$
+</div>
+
+---
+
+### Functional regression approach 
+<div style="font-size: 95%;">
+Model outcomes as: 
+
+$$Y_{ij}^{i_0}\sim\text{Bernoulli}(p_{ij}^{i_0})$$
+
+where $Y_{ij}^{i_0} = 1$ if subject $i$ in second $j$ belongs to subject $i_0$, and 0 otherwise
+
+Model: 
+
+$$\text{logit}(p_{ij}^{i_0}) =\beta_0^{i_0} + \int_{u=1}^S\int_{s=u}^SF_{i_0}\{ v_{ij}(s), v_{ij}(s-u), u\}dsdu $$
+
+$u = 1, \dots, S = 100$ (number of observations per second) 
+
+</div>
+
+---
+
+### Functional regression approach 
+<div style="font-size: 95%;">
+Model outcomes as: 
+
+$$Y_{ij}^{i_0}\sim\text{Bernoulli}(p_{ij}^{i_0})$$
+
+where $Y_{ij}^{i_0} = 1$ if subject $i$ in second $j$ belongs to subject $i_0$, and 0 otherwise
+
+Model: 
 
 $$\text{logit}(p_{ij}^{i_0}) =\beta_0^{i_0} + \int_{u=1}^S\int_{s=u}^SF_{i_0}\{ v_{ij}(s), v_{ij}(s-u), u\}dsdu $$
 
@@ -1820,11 +1968,83 @@ $u = 1, \dots, S = 100$ (number of observations per second)
 
 $v_{ij}(s)$ = acceleration at centisecond $s$ for subject $i$ in second $j$
 
-$F(\cdot, \cdot, \cdot)$: trivariate smooth function 
+</div>
 
-::: footer
-Hat tip to [Edward Gunning](https://edwardgunning.github.io/) for the idea for these figures
-:::
+---
+
+### Functional regression approach 
+<div style="font-size: 95%;">
+Model outcomes as: 
+
+$$Y_{ij}^{i_0}\sim\text{Bernoulli}(p_{ij}^{i_0})$$
+
+where $Y_{ij}^{i_0} = 1$ if subject $i$ in second $j$ belongs to subject $i_0$, and 0 otherwise
+
+Model: 
+
+$$\text{logit}(p_{ij}^{i_0}) =\beta_0^{i_0} + \int_{u=1}^S\int_{s=u}^SF_{i_0}\{ v_{ij}(s), v_{ij}(s-u), u\}dsdu $$
+
+$u = 1, \dots, S = 100$ (number of observations per second) 
+
+$v_{ij}(s)$ = acceleration at centisecond $s$ for subject $i$ in second $j$
+
+$F(\cdot, \cdot, \cdot)$: trivariate smooth function, takes values at every point in the domain of acceleration, lag acceleration, lags
+</div>
+
+---
+
+### Functional regression approach 
+<div style="font-size: 95%;">
+Model outcomes as: 
+
+$$Y_{ij}^{i_0}\sim\text{Bernoulli}(p_{ij}^{i_0})$$
+
+where $Y_{ij}^{i_0} = 1$ if subject $i$ in second $j$ belongs to subject $i_0$, and 0 otherwise
+
+Model: 
+
+$$\text{logit}(p_{ij}^{i_0}) =\beta_0^{i_0} + \int_{u=1}^S\int_{s=u}^SF_{i_0}\{ v_{ij}(s), v_{ij}(s-u), u\}dsdu $$
+
+$u = 1, \dots, S = 100$ (number of observations per second) 
+
+$v_{ij}(s)$ = acceleration at centisecond $s$ for subject $i$ in second $j$
+
+$F(\cdot, \cdot, \cdot)$: trivariate smooth function, takes values at every point in the domain of acceleration, lag acceleration, lags
+
+Fit using penalized splines with a quadratic penalty on the functional coefficient [@Wood2016]
+</div>
+---
+
+### Functional regression approach: implementation
+
+<div style="font-size: 1.8em;">
+
+```{r}
+#| eval: false
+#| echo: true 
+
+model = mgcv::gam(
+  Y_mat ~ te(
+    accel_mat,
+    lag_accel_mat,
+    lag_mat,
+    k = c(5, 5, 5),
+    by = weight_mat),
+  family = binomial(),
+  method = "REML"
+)
+```
+
+</div>
+
++ $\texttt{te()}$: tensor product smooth 
+
++ $\texttt{k = c(5, 5, 5)}$ number of basis functions for each dimension of the tensor product smooth
+
++ $\texttt{weight\_mat}$: matrix of weights of linear functionals of smooth terms. We use equal weights so the $i,j^{\mathrm{th}}$ entry is $\texttt{1/nrow(accel\_mat)}$
+
++ $\texttt{method="REML"}$: smoothing parameter selection with restricted maximum likelihood 
+
 
 ---
 
@@ -1874,12 +2094,12 @@ Two sessions at least 1 week apart
 
 + Train and test on session 1
   + Logistic regression: 92 (97) 
-  + Machine learning: 93 (99)
+  + XGBoost: 93 (99)
   + <span style="color:#009E73;">Functional regression: 98 (100)</span>
 
 + Train on session 1, test on session 2 
   + Logistic regression: 41 (75)
-  + <span style="color:#009E73;">Machine learning: 58 (78)</span>
+  + <span style="color:#009E73;">XGBoost: 58 (78)</span>
   + Functional regression: 53 (69)
 :::
 ::::
@@ -1939,60 +2159,54 @@ $\rightarrow$ Yes!
 
 ### Validation: identifying walking in free-living datasets
 
-5 open source algorithms, 3 datasets with gold-standard step counts 
+5 open-source algorithms, 3 datasets with gold-standard step counts 
 
 ```{r algo compare}
 #| cache: true
-p1 = 
+
+median_df = 
   step_acc %>% 
-  filter(cat_activity %in% c("clemson_overall", "oxwalk100")) %>% 
-  filter(algorithm %in% c("steps_scrf", "steps_vsrres")) %>% 
-  ggplot(aes(x = cat_activity, y = f1, color = algorithm)) + 
-  geom_boxplot(outlier.shape = NA, position = position_dodge()) + 
-  geom_point(position = position_jitterdodge(jitter.width = .15)) +
-  labs(x = "", y = "F1 Score", subtitle = "Walking identification accuracy") +
-  scale_x_discrete(labels = c("Dataset 1", "Dataset 2")) +
-  scale_color_manual(values = c("#E69F00", "#56B4E9"),
-                     labels = c("Algorithm 1", "Algorithm 2"),
-                     name = "") + 
-  theme(legend.position = c(0.2, 0.4))
+  filter(cat_activity %in% c("clemson_overall", "oxwalk100", "marea")) %>% 
+  filter(algorithm %in% c("steps_scrf_30", "steps_scssl_30", "steps_vsrres_30", "steps_oak_30")) %>% 
+  mutate(algorithm = fct_reorder(algorithm, ape, median)) %>% 
+  group_by(algorithm) %>% 
+  summarize(med = median(ape), .groups = "drop")
 
-p1a = step_res %>% 
-  filter(cat_activity %in% c("oxwalk100"),
-         algorithm %in% c("steps_truth", "steps_scrf", "steps_vsrres")) %>% 
-  pivot_wider(names_from = algorithm, values_from = total_steps) %>% 
-  pivot_longer(cols = c(steps_vsrres, steps_scrf), names_to = "algo", values_to = "steps") %>% 
-  ggplot(aes(x = steps_truth, y = steps, color = algo)) + 
-  geom_point(size = 2) + 
-  geom_labelabline(slope = 1, label = "y=x line", color = "#444444") +
-  labs(x = "True Steps", y = "Algorithm-Estimated Steps", subtitle = "Step count accuracy: Dataset 1") +
-  scale_x_continuous(limits = c(0, 6000)) + 
-  scale_y_continuous(limits = c(0, 6000)) +
-  scale_color_manual(values = c("#E69F00", "#56B4E9"),
-                     labels = c("Algorithm 1", "Algorithm 2"),
-                     name = "") + 
-  theme(legend.position = c(0.8, 0.4))
 
-p1b = step_res %>% 
-  filter(cat_activity %in% c("clemson_walk_irregular", "clemson_walk_regular", "clemson_walk_semiregular"),
-         algorithm %in% c("steps_truth", "steps_scrf", "steps_vsrres")) %>% 
-  pivot_wider(names_from = algorithm, values_from = total_steps) %>% 
-  pivot_longer(cols = c(steps_vsrres, steps_scrf), names_to = "algo", values_to = "steps") %>% 
-  ggplot(aes(x = steps_truth, y = steps, color = algo)) + 
-  geom_point(size = 2) + 
-  geom_labelabline(slope = 1, label = "y=x line", color = "#444444") +
-  labs(x = "True Steps", y = "Algorithm-Estimated Steps", subtitle = "Step count accuracy: Dataset 2") +
-  scale_color_manual(values = c("#E69F00", "#56B4E9"),
-                     labels = c("Algorithm 1", "Algorithm 2"),
-                     name = "") + 
-  theme(legend.position = "none") +
-  scale_x_continuous(limits = c(0, 1250)) + 
-  scale_y_continuous(limits = c(0, 1250))
+step_acc %>% 
+  filter(cat_activity %in% c("clemson_overall", "oxwalk100", "marea")) %>% 
+  filter(algorithm %in% c("steps_scrf_30", "steps_scssl_30", "steps_vsrres_30", "steps_oak_30")) %>% 
+  mutate(algorithm = fct_reorder(algorithm, ape, median)) %>% 
+  ggplot(aes(x = algorithm, y = ape, fill = algorithm)) + 
+  geom_boxplot(color = "black")  +
+  scale_fill_manual(values =c( "#E69F00", "#56B4E9", "#009E73", "#CC79A7")) +
+  theme(legend.position = "none") + 
+  scale_x_discrete(labels = c("Self-Supervised Learner +\nPeak Finding", "Random Forest +\nPeak Finding", "Frequency Domain", "Peak Finding with\n Thresholds")) +
+  labs(x = "Algorithm Type", y = "Absolute Percent Error", title = "Step Count Accuracy Across Algorithms") +
+  scale_y_continuous(limits=c(0, 75), breaks = seq(0,75,15)) +
+  geom_label(data = median_df, 
+             aes(x = algorithm, y = med, label = round(med)))
 
-p1 / (p1a + p1b + plot_layout(axis_titles = "collect")) 
 ```
 
 <div style=" position: absolute; bottom: 0.5em; right: -4em; font-size: 0.7em; color: #777; "> @Koffman2024_steps </div>
+
+---
+
+
+
+### Application: idenfiying walking and counting steps in NHANES 
+
++ $>15,000$ participants
++ $7$ days of wrist accelerometry
++ $10$Tb of data 
++ Over 1 year computation time 
++ Open source pipeline 
++ Open source data repository 
++ **First** nationally representative estimate of steps in the US population
+
+![](figs/physionet.png){width=70%}
+<div style=" position: absolute; bottom: 0.5em; right: -4em; font-size: 0.7em; color: #777; "> @physionet </div>
 
 ---
 
@@ -2006,29 +2220,29 @@ How many steps does the average American take per day?
 xdf = steps %>% 
   select(age = age_in_years_at_screening, gender,(contains("total") & contains("step"))) %>% 
   mutate(age = if_else(is.na(age), 0, age)) %>% 
-  mutate(age_cat = cut(age, breaks = c(0, 18, 30, 40, 50, 60, 70, Inf)), include.lowest = TRUE) 
+ mutate(age_cat = cut(age, breaks = c(0, 17, 29, 39, 49, 59, 69, Inf)), include.lowest = TRUE) 
 
-m_ya = median(xdf$total_scrfsteps[xdf$age_cat == "(18,30]"])
-m_child  = median(xdf$total_scrfsteps[xdf$age_cat == "(0,18]"])
-m_old = median(xdf$total_scrfsteps[xdf$age_cat == "(70,Inf]"])
+m_ya = median(xdf$total_scsslsteps[xdf$age_cat == "(17,29]"])
+m_child  = median(xdf$total_scsslsteps[xdf$age_cat == "(0,17]"])
+m_old = median(xdf$total_scsslsteps[xdf$age_cat == "(69,Inf]"])
 
 
 xdf %>% 
-  select(age_cat, steps = total_scrfsteps) %>% 
+  select(age_cat, steps = total_scsslsteps) %>% 
   ggplot(aes(x = steps, y = age_cat, fill = after_stat(x))) +
   geom_density_ridges_gradient(scale = 3, quantile_lines = TRUE, quantiles = 2) +
   scale_fill_viridis_c(option = "B", name = "Mean daily steps per day") +
   scale_x_continuous(limits=c(0,25000),
                      labels = seq(0, 30, 5),
                      breaks = seq(0, 30000, 5000)) +
-  scale_y_discrete(labels = c("<19", "19-29", "30-39", "40-49", "50-59", "60-69", "70+")) +
+  scale_y_discrete(labels = c("<18", "18-29", "30-39", "40-49", "50-59", "60-69", "70+")) +
   theme(legend.position = "none") + 
   labs(x = "Mean steps per day (x1000)", y = "Age category") +
   annotate(
     geom = "label",
     x = 15000,
     y = 2,
-    label = "Median daily steps <19 yrs: 12.5k",
+    label = "Median daily steps <19 yrs: 9k",
     hjust = 0,
     color = "#444444"
   )  +
@@ -2055,13 +2269,67 @@ xdf %>%
 
 ```
 
-<div style=" position: absolute; bottom: 0.5em; right: -4em; font-size: 0.7em; color: #777; "> @physionet </div>
-
 ---
 
 ### Application: idenfiying walking and counting steps in NHANES 
 
-Is taking more steps better for you? 
+Do estimates differ by algorithm?
+
+```{r ridges2}
+#| cache: true 
+
+mdf = 
+  xdf %>% 
+  select(age_cat, total_scrfsteps, total_scsslsteps,
+         total_vsrevsteps, total_oaksteps) %>% 
+  filter(age_cat %in% c("(17,29]", "(69,Inf]")) %>% 
+  mutate(age_cat = factor(age_cat, levels = c("(17,29]", "(69,Inf]"), 
+                          labels = c("Age: 18-29", "Age: 70+"))) %>% 
+  group_by(age_cat) %>% 
+  summarize(across(contains("steps"), median))
+
+ann_text = tibble(x = c(0, 0), y = c(1, 1),
+                  age_cat = c("Age: 18-29", "Age: 70+"),
+                  lab = c("Range: 8.5k to 12.5k",
+                          "Range: 3.6k to 5.8k"))
+
+xdf %>% 
+  select(age_cat, total_scrfsteps, total_scsslsteps,
+         total_vsrevsteps, total_oaksteps) %>% 
+  filter(age_cat %in% c("(17,29]", "(69,Inf]")) %>% 
+  mutate(age_cat = factor(age_cat, levels = c("(17,29]", "(69,Inf]"), 
+                          labels = c("Age: 18-29", "Age: 70+"))) %>% 
+  pivot_longer(cols = -age_cat,
+               names_to = "algorithm",
+               values_to = "steps") %>% 
+  mutate(algorithm = factor(algorithm, levels = c("total_scsslsteps", "total_scrfsteps", "total_oaksteps", "total_vsrevsteps"))) %>% 
+  ggplot(aes(x = steps, y = algorithm, fill = algorithm, color = algorithm)) +
+  geom_density_ridges(scale = 2, quantile_lines = TRUE, quantiles = 2, alpha = 0.75) +
+  facet_grid(.~age_cat) +
+  scale_fill_manual(values =c( "#E69F00", "#56B4E9", "#009E73", "#CC79A7")) +
+  scale_color_manual(values =c( "#E69F00", "#56B4E9", "#009E73", "#CC79A7")) +
+  scale_x_continuous(limits=c(0,25000),
+                     labels = seq(0, 30, 5),
+                     breaks = seq(0, 30000, 5000))  +
+  scale_y_discrete(labels = c("Self-Supervised Learner +\nPeak Finding", "Random Forest +\nPeak Finding", "Frequency Domain", "Peak Finding with\n Thresholds")) +
+  labs(x = "Mean steps per day (x1000)", y = "",
+       title = "Step Distributions by Algorithm and Age",
+       subtitle = "Median steps can differ by over 30% between algorithms") +
+  theme(legend.position = "none") +
+  geom_label(data = ann_text, 
+            aes(x = x, y = y, label = lab),
+    color = "#444444", inherit.aes = FALSE,
+    hjust = 0, vjust = 1
+  )
+
+```
+
+---
+
+
+### Application: idenfiying walking and counting steps in NHANES 
+
+Are more steps associated with lower mortality risk? 
 
 ```{r dose response}
 #| cache: true 
@@ -2077,7 +2345,7 @@ dose_resp %>%
   scale_x_continuous(breaks=seq(2000, 20000, 2000), limits = c(2000, 20000),
                      labels = seq(2, 20, 2)) +
   geom_hline(aes(yintercept = 1), linetype = "dashed") +
-  labs(x = "Daily Steps (x1000)", y = "Hazard Ratio (compared to 2000 steps/day)") +
+  labs(x = "Daily Steps (x1000); Estimated by Self-Supervised Learner", y = "Hazard Ratio (compared to 2000 steps/day)", title = "Steps and Mortality", subtitle = "Individuals aged 50 and older") +
   theme(legend.position = "none") +
   geom_rug(data = rug_dat, aes(x = value), sides = "b", color = "#D55E00", size = 0.5, alpha = 0.5) +
   annotate(geom = "label", x = 8000, y = 2, label = "Significantly lower hazard of mortality\nfor 8k steps/day compared to 2k steps/day", hjust = 0) +
@@ -2086,10 +2354,6 @@ dose_resp %>%
     color = "#444444",
     linewidth = .5) +
   annotate(geom = "label", x = 2000, y = 0.1, color = "#D55E00", label = "Mortality events", hjust = 0) 
-  # annotate(geom = "curve", x = 4000, xend = 4400, y = 0.1, yend = 0.09, 
-  #          color = "#D55E00", curvature = -0.2,
-  #          arrow = arrow(length = unit(0.1, "inches"), type = "closed"),
-  #         color = "#444444",linewidth = .5)
 ```
 
 <div style=" position: absolute; bottom: 0.5em; right: -4em; font-size: 0.7em; color: #777; "> @nhanes_steps </div>
@@ -2454,7 +2718,7 @@ $\rightarrow$ Yes!
 
 ### Digital fingerprinting in NHANES 
 
-- Use highly specific method to identify walking in NHANES (minimize false positives) @Karas2019
+- Use highly specific method to identify walking in NHANES (minimize false positives) [@Karas2019]
 - $N = 13{,}000$ individuals with 3 minutes walking per person 
 - 3:1 train/test split 
 - Logistic regression + weighting to overcome class imbalance
@@ -2483,7 +2747,8 @@ p1 = dens_df %>%
   scale_y_continuous(limits=c(0,3), breaks=seq(0, 3, 0.5)) +
   theme(legend.position = c(0.9, 0.7),
         panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank())
+        panel.grid.minor = element_blank(),
+        strip.text = element_text(color = "white", size = 11))
 
 p2 = sample_dat2 %>%
   filter(id == 78898) %>%
@@ -2499,7 +2764,8 @@ p2 = sample_dat2 %>%
   scale_y_continuous(limits=c(0, 2.5)) +
   labs(x = "Time (sec)", y = "Acceleration (g)") +
   theme(panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank())
+        panel.grid.minor = element_blank(),
+        strip.text = element_text(color = "white", size = 11))
 
 
 p3 = dens_df %>%
@@ -2514,7 +2780,8 @@ p3 = dens_df %>%
   scale_y_continuous(limits=c(0,3), breaks=seq(0, 3, 0.5)) +
   theme(legend.position = c(0.9, 0.7),
         panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank())
+        panel.grid.minor = element_blank(),
+        strip.text = element_text(color = "white", size = 11))
 
 p4 = sample_dat2 %>%
   filter(id == 68561) %>%
@@ -2530,7 +2797,8 @@ p4 = sample_dat2 %>%
   scale_y_continuous(limits=c(0,2.5)) +
   labs(x = "Time (sec)", y = "Acceleration (g)") +
   theme(panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank())
+        panel.grid.minor = element_blank(),
+        strip.text = element_text(color = "white", size = 11))
 
 (p2 + p1) / (p4 + p3)
 ```
