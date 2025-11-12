@@ -1758,11 +1758,11 @@ pred_df %>%
 
 ---
 
-### Why not use the entire joint distribution? 
+### Why not use all possible lags? 
 
 ---
 
-### Why not use the entire joint distribution? 
+### Why not use all possible lags? 
 #### Functional regression approach 
 
 
@@ -1774,7 +1774,7 @@ Hat tip to [Edward Gunning](https://edwardgunning.github.io/) for the idea for t
 
 ---
 
-### Why not use the entire joint distribution? 
+### Why not use all possible lags? 
 
 #### Functional regression approach 
 
@@ -1785,7 +1785,7 @@ Hat tip to [Edward Gunning](https://edwardgunning.github.io/) for the idea for t
 :::
 ---
 
-### Why not use the entire joint distribution? 
+### Why not use all possible lags? 
 
 #### Functional regression approach 
 
@@ -1796,7 +1796,7 @@ Hat tip to [Edward Gunning](https://edwardgunning.github.io/) for the idea for t
 :::
 ---
 
-### Why not use the entire joint distribution? 
+### Why not use all possible lags? 
 
 #### Functional regression approach 
  
@@ -1934,43 +1934,6 @@ $$\text{logit}(p_{ij}^{i_0}) =\beta_0^{i_0} + \int_{u=1}^S\int_{s=u}^SF_{i_0}\{ 
 
 ---
 
-### Functional regression approach 
-<div style="font-size: 95%;">
-Model outcomes as: 
-
-$$Y_{ij}^{i_0}\sim\text{Bernoulli}(p_{ij}^{i_0})$$
-
-where $Y_{ij}^{i_0} = 1$ if subject $i$ in second $j$ belongs to subject $i_0$, and 0 otherwise
-
-Model: 
-
-$$\text{logit}(p_{ij}^{i_0}) =\beta_0^{i_0} + \int_{u=1}^S\int_{s=u}^SF_{i_0}\{ v_{ij}(s), v_{ij}(s-u), u\}dsdu $$
-
-$u = 1, \dots, S = 100$ (number of observations per second) 
-
-</div>
-
----
-
-### Functional regression approach 
-<div style="font-size: 95%;">
-Model outcomes as: 
-
-$$Y_{ij}^{i_0}\sim\text{Bernoulli}(p_{ij}^{i_0})$$
-
-where $Y_{ij}^{i_0} = 1$ if subject $i$ in second $j$ belongs to subject $i_0$, and 0 otherwise
-
-Model: 
-
-$$\text{logit}(p_{ij}^{i_0}) =\beta_0^{i_0} + \int_{u=1}^S\int_{s=u}^SF_{i_0}\{ v_{ij}(s), v_{ij}(s-u), u\}dsdu $$
-
-$u = 1, \dots, S = 100$ (number of observations per second) 
-
-$v_{ij}(s)$ = acceleration at centisecond $s$ for subject $i$ in second $j$
-
-</div>
-
----
 
 ### Functional regression approach 
 <div style="font-size: 95%;">
@@ -2048,42 +2011,12 @@ model = mgcv::gam(
 
 ---
 
-### Why not use fancier models? 
+### Functional regression results
 
 :::: {.columns}
 
-::: {.column width="55%"}
-
-
-![](figs/forest.png){width=50%}
-
-![](figs/rocket2.png){width=50%}
-:::
-
 ::: {.column width="45%"}
 
-:::
-::::
-
-<div style=" position: absolute; bottom: 1em; right: -4em; font-size: 0.7em; color: #777; "> @Koffman2024 </div>
-
----
-
-
-
-### Why not use fancier models? 
-
-:::: {.columns}
-
-::: {.column width="55%"}
-
-
-![](figs/forest.png){width=50%}
-
-![](figs/rocket2.png){width=50%}
-:::
-
-::: {.column width="45%"}
 Rank-1 (rank-5) % accuracies 
 
 153 person dataset
@@ -2094,14 +2027,56 @@ Two sessions at least 1 week apart
 
 + Train and test on session 1
   + Logistic regression: 92 (97) 
-  + XGBoost: 93 (99)
   + <span style="color:#009E73;">Functional regression: 98 (100)</span>
 
 + Train on session 1, test on session 2 
   + Logistic regression: 41 (75)
-  + <span style="color:#009E73;">XGBoost: 58 (78)</span>
-  + Functional regression: 53 (69)
+  + <span style="color:#009E73;">Functional regression: 53 (69)</span>
 :::
+
+::: {.column width="55%"}
+
+:::
+
+::::
+
+---
+
+### Why not use fancier models? 
+
+:::: {.columns}
+
+::: {.column width="45%"}
+
+Rank-1 (rank-5) % accuracies 
+
+153 person dataset
+
+3 min of walking seach
+
+Two sessions at least 1 week apart 
+
++ Train and test on session 1
+  + Logistic regression: 92 (97) 
+  + <span style="color:#009E73;">Functional regression: 98 (100)</span>
+  + XGBoost: 93 (99)
+
++ Train on session 1, test on session 2 
+  + Logistic regression: 41 (75)
+  + Functional regression: 53 (69)
+  + <span style="color:#009E73;">XGBoost: 58 (78)</span>
+
+:::
+
+
+::: {.column width="55%"}
+
+![](figs/forest.png){width=50%}
+
+![](figs/rocket2.png){width=50%}
+
+:::
+
 ::::
 
 <div style=" position: absolute; bottom: 1em; right: -4em; font-size: 0.7em; color: #777; "> @Koffman2024 </div>
@@ -2156,6 +2131,13 @@ $\rightarrow$ Yes!
 
 ---
 
+### Validation: identifying walking in free-living datasets
+
++ Track down free-living datasets with wrist-worn accelerometry and gold standard step counts
++ Find and implement open-source algorithms for step counting from wrist accelerometry
++ Evaluate performance of algorithms 
+
+---
 
 ### Validation: identifying walking in free-living datasets
 
@@ -2218,7 +2200,7 @@ How many steps does the average American take per day?
 #| cache: true 
 
 xdf = steps %>% 
-  select(age = age_in_years_at_screening, gender,(contains("total") & contains("step"))) %>% 
+  select(age = age_in_years_at_screening, gender, (contains("total") & contains("step"))) %>% 
   mutate(age = if_else(is.na(age), 0, age)) %>% 
  mutate(age_cat = cut(age, breaks = c(0, 17, 29, 39, 49, 59, 69, Inf)), include.lowest = TRUE) 
 
@@ -2231,13 +2213,13 @@ xdf %>%
   select(age_cat, steps = total_scsslsteps) %>% 
   ggplot(aes(x = steps, y = age_cat, fill = after_stat(x))) +
   geom_density_ridges_gradient(scale = 3, quantile_lines = TRUE, quantiles = 2) +
-  scale_fill_viridis_c(option = "B", name = "Mean daily steps per day") +
+  scale_fill_viridis_c(option = "B", name = "Mean daily steps per day, estimated by Self-Supervised Learner") +
   scale_x_continuous(limits=c(0,25000),
                      labels = seq(0, 30, 5),
                      breaks = seq(0, 30000, 5000)) +
   scale_y_discrete(labels = c("<18", "18-29", "30-39", "40-49", "50-59", "60-69", "70+")) +
   theme(legend.position = "none") + 
-  labs(x = "Mean steps per day (x1000)", y = "Age category") +
+  labs(x = "Mean Steps per Day (x1000); Estimated by Self-Supervised Learner", y = "Age category") +
   annotate(
     geom = "label",
     x = 15000,
@@ -2290,8 +2272,8 @@ mdf =
 
 ann_text = tibble(x = c(0, 0), y = c(1, 1),
                   age_cat = c("Age: 18-29", "Age: 70+"),
-                  lab = c("Range: 8.5k to 12.5k",
-                          "Range: 3.6k to 5.8k"))
+                  lab = c("Range in medians: 8.5k to 12.5k",
+                          "Range in medians: 3.6k to 5.8k"))
 
 xdf %>% 
   select(age_cat, total_scrfsteps, total_scsslsteps,
@@ -2312,7 +2294,7 @@ xdf %>%
                      labels = seq(0, 30, 5),
                      breaks = seq(0, 30000, 5000))  +
   scale_y_discrete(labels = c("Self-Supervised Learner +\nPeak Finding", "Random Forest +\nPeak Finding", "Frequency Domain", "Peak Finding with\n Thresholds")) +
-  labs(x = "Mean steps per day (x1000)", y = "",
+  labs(x = "Mean Steps per Day (x1000)", y = "",
        title = "Step Distributions by Algorithm and Age",
        subtitle = "Median steps can differ by over 30% between algorithms") +
   theme(legend.position = "none") +
@@ -2425,101 +2407,87 @@ steps_summ %>%
 
 ### Function on scalar regression 
 
-Implementation: Fast univariate inference (FUI) @Cui2021
-$$\mathbb{E}[\mathrm{steps}_i(s)] = \beta_0(s) + \beta_1(s)\mathrm{gender}_i + \beta_2(s)\mathrm{age}_i $$ 
+::: {.incremental}
++ Outcome: steps profile over the course of the day (function) 
 
-$i$: participant
++ Predictors: age, sex (scalars)
 
++ Model: $$\mathbb{E}[\mathrm{steps}_i(s)] = \beta_0(s) + \beta_1(s)\mathrm{sex}_i + \beta_2(s)\mathrm{age}_i $$ 
+$i$: participant; 
 $s \in \{1, \dots, 1440\}$: each minute of the day
 
-Fit separate GLM at each point $s$ and smooth the resulting point estimates to get estimated effect of age, sex on steps profile
++ **Interpretation**
+  + $\beta_0(s)$: expected steps for reference sex category and age 0
+  + $\beta_1(s)$: change in steps for females compared to males, holding age constant 
+  + Can be interpreted at specific points of the day (e.g., how many more steps do males take at 12pm?) 
 
-Bootstrap subjects to get confidence bands 
+:::
 
 ---
 
-### Function on scalar regression 
+### Function on scalar regression: implementation 
+::: {.incremental}
 
-Implementation: Fast univariate inference (FUI) @Cui2021
-$$\mathbb{E}[\mathrm{steps}_i(s)] = \beta_0(s) + \beta_1(s)\mathrm{gender}_i + \beta_2(s)\mathrm{age}_i $$ 
++ Fast univariate inference (FUI) [@Cui2021]
 
-$i$: participant
++ Fit separate (univariate) GLM at each point $s$, smooth the resulting point estimates 
 
-$s \in \{1, \dots, 1440\}$: each minute of the day
++ Bootstrap subjects to get confidence bands 
 
-Fit separate GLM at each point $s$ and smooth the resulting point estimates to get estimated effect of age, sex on steps profile
 
-Bootstrap subjects to get confidence bands 
++ <span style="color:red;">BUT: NHANES is not a simple random sample</span>
 
-<br>
-<span style="color:red;">BUT: NHANES is not a simple random sample</span>
+  + Individuals are sampled in geographic clusters
 
-+ Individuals are sampled in geographic clusters
+  + Minority groups are oversampled 
 
-+ Minority groups are oversampled 
++ Are our estimates valid for population-level inference? 
 
-Are our estimates valid for population-level inference? 
+:::
 
 ---
 
 
-### Function on scalar regression 
+### Survey function on scalar regression 
+::: {.incremental}
 
-Implementation: Fast univariate inference (FUI) @Cui2021
-$$\mathbb{E}[\mathrm{steps}_i(s)] = \beta_0(s) + \beta_1(s)\mathrm{gender}_i + \beta_2(s)\mathrm{age}_i $$ 
++ For standard regression, well developed methods and software exist that take into accounts weights and correlation between clusters (e.g. $\texttt{svyglm}$, $\texttt{svycoxph}$) [@surveys]
 
-$i$: participant
 
-$s \in \{1, \dots, 1440\}$: each minute of the day
++ No such methods for function on scalar regression 
 
-Fit separate GLM at each point $s$ and smooth the resulting point estimates to get estimated effect of age, sex on steps profile
++ FUI built on separate GLMS
 
-Bootstrap subjects to get confidence bands 
++ **Idea**: incorporate survey weights into the GLMs and use survey-aware replication/bootstrap methods for inference 
+:::
 
-<br>
-<span style="color:red;">BUT: NHANES is not a simple random sample</span>
-
-+ Individuals are sampled in geographic clusters
-
-+ Minority groups are oversampled 
-
-Are our estimates valid for population-level inference? 
-
-For standard regression: $\texttt{svyglm}$, $\texttt{svycoxph}$
 ---
 
+### Survey function on scalar regression: simulation 
+::: {.incremental}
+First ever simulation study to evaluate function on scalar regression in complex survey settings 
 
++ **Generate** superpopulation 
+  + Each individual has functional outcome and covariate
+  + Individuals belong to clusters (geographic areas)
+  + Functional outcomes correlated within clusters
++ **Sample** from superpopulation in each iteration of simulation
+  + Selection probability related to functional outcome (informative sampling)
++ **Compare**: 
+  + Unweighted model w/ standard bootstrap
+  + Weighted models with weighted bootstrap 
+  + Weighted models with complex survey bootstrap (2)
++ **Evaluate**:   
+  + Bias in coefficient estimation 
+  + Coverage of confidence intervals 
 
-### Function on scalar regression 
+::: 
 
-Implementation: Fast univariate inference (FUI) @Cui2021
-$$\mathbb{E}[\mathrm{steps}_i(s)] = \beta_0(s) + \beta_1(s)\mathrm{gender}_i + \beta_2(s)\mathrm{age}_i $$ 
-
-$i$: participant
-
-$s \in \{1, \dots, 1440\}$: each minute of the day
-
-Fit separate GLM at each point $s$ and smooth the resulting point estimates to get estimated effect of age, sex on steps profile
-
-Bootstrap subjects to get confidence bands 
-
-<br>
-<span style="color:red;">BUT: NHANES is not a simple random sample</span>
-
-+ Individuals are sampled in geographic clusters
-
-+ Minority groups are oversampled 
-
-Are our estimates valid for population-level inference? 
-
-For standard regression: $\texttt{svyglm}$, $\texttt{svycoxph}$
-
-For functional regression: ? 
 ---
 
 
 
-### Complex survey function on scalar regression: simulation
+### Survey function on scalar regression: simulation
 
 ```{r survey sim res}
 #| cache: true 
@@ -2587,14 +2555,14 @@ p1 + p2 + plot_layout(widths = c(.7, 1)) + plot_annotation(caption = "*Balanced 
 
 ---
 
-### Complex survey function on scalar regression: software 
+### Survey function on scalar regression: software 
 
 <div style="font-size: 2em;">
 ```{r}
 #| echo: true 
 #| eval: false 
 
-model_fit = svyfosr::svyfui(steps_mat ~ age + gender,
+model_fit = svyfosr::svyfui(steps_mat ~ age + sex,
                             weights = survey_weight,
                             data = steps_df,
                             family = gaussian(),
@@ -2610,23 +2578,8 @@ model_fit = svyfosr::svyfui(steps_mat ~ age + gender,
 
 ---
 
-### Complex survey function on scalar regression: application
 
-$$\mathbb{E}[\mathrm{steps}_i(s)] = \beta_0(s) + \beta_1(s)\mathrm{gender}_i + \beta_2(s)\mathrm{age}_i $$ 
-
-$i$: participant
-
-$s \in \{1, \dots, 1440\}$: each minute of the day
-
-$\beta_0(s)$: mean steps over the course of the day taken for males age 0
-
-
-$\beta_1(s)$: how many additional steps do females take compared to males, over the course of the day, controlling for age? 
-
-
----
-
-### Complex survey function on scalar regression: application
+### Survey function on scalar regression: application
 
 ```{r steps application}
 #| cache: true
