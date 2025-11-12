@@ -263,10 +263,12 @@ df_anim = df %>%
 
 p2 <- df %>%
   filter(!is.na(lag_vm)) %>%
-  mutate(col = if_else(row_number() %in% c(1, 2), "highlight", "normal")) %>%
+  mutate(col = case_when(row_number() == 1 ~ "1",
+                         row_number() == 2 ~ "2",
+                         .default = "3")) %>%
   ggplot(aes(x = vm, y = lag_vm)) +
   geom_point(aes(group = time, color = col), size = 1.5) +
-  scale_color_manual(values = c("#56B4E9", "#383838")) +
+  scale_color_manual(values = c("#56B4E9", "#D55E00", "#383838")) +
   scale_x_continuous(limits = c(0.4, 2.6)) +
   scale_y_continuous(limits = c(0.4, 2.6)) +
   theme(panel.grid = element_blank(),
@@ -316,11 +318,44 @@ p_anim = p +
   transition_reveal(along = frame) +
   shadow_wake(wake_length = 1, exclude_layer = c(3))
 
+df_anim = df %>%
+  filter(!is.na(lag_vm)) %>%
+  pivot_longer(cols = c(vm, lag_vm), names_to = "variable", values_to = "value") %>%
+  rename(frame = time) %>%
+  mutate(variable = factor(variable, levels = c("vm", "lag_vm"),
+                           labels = c("Acceleration (g)", "0.15s lagged acceleration")))
+
+# Pivot once, outside of ggplot
+df_long <- df %>%
+  select(vm, lag_vm, ID2, time) %>%
+  pivot_longer(cols = c(vm, lag_vm), names_to = "variable", values_to = "value") %>%
+  mutate(variable = factor(variable, levels = c("vm", "lag_vm"),
+                           labels = c("Acceleration (g)", "0.15s lagged acceleration")))
+
+p = ggplot(df_long, aes(x = time, y = value,  group = variable)) +
+  geom_line(linewidth = 1.1, color = "#F0E442") +
+  geom_point(data = df_anim, aes(x = frame, y = value, color = variable, group = variable)) +
+  scale_color_manual(values = c("black", "darkgrey")) +
+  # scale_linetype_manual(values = c("solid", "dashed")) +
+  labs(x = "Time (s)", y = "Acceleration (g)") +
+  coord_cartesian(clip = "off") +
+  theme(
+    legend.position = "none",
+    panel.grid = element_blank(),
+    plot.margin = margin(40, 20, 40, 40),
+    axis.title.x = element_text(vjust = 1.5),
+    axis.title.y = element_text(vjust = -1.2)
+  ) +
+  transition_reveal(time) +   # reveal along the "time" column
+  shadow_wake(wake_length = 0.1) # small wake to keep lines visible
+
+animate(p, nframes = 100, fps = 20)
+
 # suppressWarnings(animate(p_anim, fps = 5, nframes = 101, width = 600, height = 250, renderer = gifski_renderer()))
 # anim_save(here::here("docs", "figs", "p1.gif"), renderer = gifski_renderer())
 
-suppressWarnings(animate(p_anim, fps = 15, nframes = 101, width = 1200, height = 600, res = 150, renderer = gifski_renderer()))
-anim_save(here::here("docs", "figs", "p1a.gif"), renderer = gifski_renderer())
+suppressWarnings(animate(p, fps = 15, nframes = 101, width = 1200, height = 600, res = 150, renderer = gifski_renderer()))
+anim_save(here::here("docs", "figs", "p1a_v2.gif"), renderer = gifski_renderer())
 
 
 
