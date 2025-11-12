@@ -1,11 +1,16 @@
 ---
-title: "Job Talk"
-subtitle: "Methods and Applications for High-Frequency Biosignals Data"
+title: "Methods and Applications for High-Frequency Biosignals Data"
+title-slide-attributes:
+    data-background-image: figs/qr_code.png
+    data-background-size: 20%
+    data-background-position: 95% 95%
+subtitle: ""
 author: "Lily Koffman"
+institute: "Department of Biostatistics, Johns Hopkins School of Public Health" 
 format:
   revealjs:
     theme: custom.scss
-    slide-number: true
+    slide-number: false
     toc: false
     progress: true
     hash: true
@@ -94,9 +99,9 @@ scale_fill_okabe  <- function(...) scale_fill_manual(values = okabe_ito, ...)
 ```
 
 
-
 ```{r data read in and processing}
 #| cache: true 
+#| include: false
 
 # --- accel data ----- # 
 walking = read_rds(here::here("docs", "data", "walking.rds"))
@@ -290,6 +295,7 @@ dens_df_s6_l30 =
 
 dens_df_s6_l30$density = get_density(dens_df_s6_l30$vm, dens_df_s6_l30$lag_vm, n = 100)
 ```
+
 
 ## Introduction: accelerometry data 
 
@@ -1888,7 +1894,12 @@ $\rightarrow$ Yes!
 - <span style="color:gray;">Can we generalize conclusions from free-living accelerometry data to the US population?</span> 
 - <span style="color:gray;">Can we apply these methods in other, non-accelerometry datasets? </span>
 
+
+
+# Can we accurately find walking and count steps in free-living datasets?
+
 ---
+
 
 ### Validation: identifying walking in free-living datasets
 
@@ -2080,6 +2091,10 @@ $\rightarrow$ Yes!
 - Can we generalize conclusions from free-living accelerometry data to the US population?
 - <span style="color:gray;">Can we apply these methods in other, non-accelerometry datasets? </span>
 
+
+
+
+# Can we generalize conclusions from free-living accelerometry data to the US population?
 
 ---
 
@@ -2320,8 +2335,11 @@ $\rightarrow$ Yes!
 <span style="color:gray;">$\rightarrow$ Yes! </span>
 - <span style="color:gray;">Can we apply these methods in other, non-accelerometry datasets? </span>
 
----
 
+
+# Can we identify someone from their walking pattern measured by a wrist-worn accelerometer in big, free-living datasets?
+
+---
 
 ### Digital fingerprinting in NHANES 
 
@@ -2445,6 +2463,9 @@ $\rightarrow$ Yes!
 - Can we apply these methods in other, non-accelerometry datasets?
 
 
+
+# Can we apply these methods in other, non-accelerometry datasets?
+
 ---
 
 ### Arterial waveform 
@@ -2453,20 +2474,38 @@ $\rightarrow$ Yes!
 
 ::: {.column width="50%"}
 
-![](figs/a_line.png)
+![](figs/a_line.png){.equalheight}
 
 :::
 
 ::: {.column width="50%"}
 
 
-![](figs/abp.png)
 :::
 
 ::::
 
 ---
 
+### Arterial waveform 
+
+:::: {.columns}
+
+::: {.column width="50%"}
+
+![](figs/a_line.png){.equalheight}
+
+:::
+
+::: {.column width="50%"}
+
+
+![](figs/abp.png){.equalheight}
+:::
+
+::::
+
+---
 
 ### Arterial waveform 
 
@@ -2706,6 +2745,18 @@ $\rightarrow$ Yes!
 + Standardizing processing and analysis pipelines for wearable accelerometry 
 
 :::
+
+---
+
+## Thank you!
+
+
+<br>
+
+- Link to slides: [https://lilykoff.github.io/job_talk2025](lilykoff.github.io/job_talk2025) 
+- Email: [lkoffma2@jh.edu](lkoffma2@jh.edu)
+- Website: [lilykoff.com](lilykoff.com)
+- Github: [github.com/lilykoff](github.com/lilykoff)
 
 ---
 
