@@ -2904,7 +2904,7 @@ p0 =
   scale_x_continuous(breaks = seq(start, start + 10, 1),
                      labels = seq(0, 10, 1)) +
   scale_y_continuous(limits=c(48, 120), breaks=seq(50,120,10)) +
-  labs(x = "Time (s)", y = "Arterial Blood Pressure",
+  labs(x = "Time (s)", y = "Arterial Blood Pressure (mmHg)",
        title = "10s of Arterial Waveform", 
        subtitle = "Patient 1")
 
@@ -2917,7 +2917,7 @@ p1 =
   scale_x_continuous(breaks = seq(start, start + 10, 1),
                      labels = seq(0, 10, 1)) +
     scale_y_continuous(limits=c(48, 120), breaks=seq(50,120,10)) +
-  labs(x = "Time (s)", y = "Arterial Blood Pressure",
+  labs(x = "Time (s)", y = "Arterial Blood Pressure (mmHg)",
        title = "10s of Arterial Waveform", 
        subtitle = "Patient 2")
 
