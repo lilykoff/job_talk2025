@@ -400,7 +400,7 @@ final_plot
 - Can we identify someone from their walking pattern measured by a wrist-worn accelerometer in big, free-living datasets? 
 - Can we accurately find walking and count steps in free-living datasets? 
 - Can we generalize conclusions from free-living accelerometry data to the US population? 
-- Can we apply these methods in other, non-accelerometry datasets? 
+- Can we apply these methods in other high-frequency data sources? 
 :::
 
 ---
@@ -413,7 +413,7 @@ final_plot
 - <span style="color:gray;">Can we identify someone from their walking pattern measured by a wrist-worn accelerometer in big, free-living datasets?</span>
 - <span style="color:gray;">Can we accurately find walking and count steps in free-living datasets? </span>
 - <span style="color:gray;">Can we generalize conclusions from free-living accelerometry data to the US population?</span> 
-- <span style="color:gray;">Can we apply these methods in other, non-accelerometry datasets? </span>
+- <span style="color:gray;">Can we apply these methods in other high-frequency data sources? </span>
 
 
 
@@ -1813,7 +1813,7 @@ Hat tip to [Edward Gunning](https://edwardgunning.github.io/) for the idea for t
 
 **Toy example**: 4 observations per second, 2 seconds, 1 individual
 
-$v_1(2)$: 2nd acceleration observation in second 1
+$v_j(s)$: $s^{th}$ acceleration observation in second $j$
 
 data
 $$\begin{bmatrix} v_1(1) & v_1(2) & v_1(3) & v_1(4) \\
@@ -1829,7 +1829,7 @@ $$
 
 **Toy example**: 4 observations per second, 2 seconds, 1 individual
 
-$v_1(2)$: 2nd acceleration observation in second 1
+$v_j(s)$: $s^{th}$ acceleration observation in second $j$
 
 data
 $$\begin{bmatrix} v_1(1) & v_1(2) & v_1(3) & v_1(4) \\
@@ -1903,7 +1903,7 @@ $u = 1, \dots, S = 100$ (number of observations per second)
 
 $v_{ij}(s)$ = acceleration at centisecond $s$ for subject $i$ in second $j$
 
-$F(\cdot, \cdot, \cdot)$: trivariate smooth function, takes values at every point in the domain of acceleration, lag acceleration, lags
+$F(\cdot, \cdot, \cdot)$: trivariate smooth function, takes values at every point in the domain of acceleration, lag acceleration, lag length
 </div>
 
 ---
@@ -1924,7 +1924,7 @@ $u = 1, \dots, S = 100$ (number of observations per second)
 
 $v_{ij}(s)$ = acceleration at centisecond $s$ for subject $i$ in second $j$
 
-$F(\cdot, \cdot, \cdot)$: trivariate smooth function, takes values at every point in the domain of acceleration, lag acceleration, lags
+$F(\cdot, \cdot, \cdot)$: trivariate smooth function, takes values at every point in the domain of acceleration, lag acceleration, lag length
 
 Fit using penalized splines with a quadratic penalty on the functional coefficient [@Wood2016]
 </div>
@@ -1939,7 +1939,7 @@ Fit using penalized splines with a quadratic penalty on the functional coefficie
 #| echo: true 
 
 model = mgcv::gam(
-  Y_mat ~ te(
+  Y ~ te(
     accel_mat,
     lag_accel_mat,
     lag_mat,
@@ -1968,7 +1968,7 @@ model = mgcv::gam(
 + Functional approach is generalization of grid cell approach 
 + Instead of discretizing space into cells, relationship between acceleration, lag acceleration, lag length is modeled as smooth, continuous surface $F$
 + Grid cell approach: piecewise constant approximation of $F$
-+ Both leverage same underlying structure 
++ Both leverage same underlying structure: how acceleration, lag acceleration pairs characterize movement
 
 :::
 
@@ -2056,7 +2056,7 @@ $\rightarrow$ Yes!
 - <span style="color:gray;">Can we identify someone from their walking pattern measured by a wrist-worn accelerometer in big, free-living datasets when we don't know when people are walking?</span>
 - <span style="color:gray;">Can we accurately find walking and count steps in free-living datasets? </span>
 - <span style="color:gray;">Can we generalize conclusions from free-living accelerometry data to the US population?</span> 
-- <span style="color:gray;">Can we apply these methods in other, non-accelerometry datasets? </span>
+- <span style="color:gray;">Can we apply these methods in other high-frequency data sources? </span>
 
 
 ---
@@ -2071,7 +2071,7 @@ $\rightarrow$ Yes!
 - Can we identify someone from their walking pattern measured by a wrist-worn accelerometer in big, free-living datasets?
 - <span style="color:gray;">Can we accurately find walking and count steps in free-living datasets? </span>
 - <span style="color:gray;">Can we generalize conclusions from free-living accelerometry data to the US population?</span> 
-- <span style="color:gray;">Can we apply these methods in other, non-accelerometry datasets? </span>
+- <span style="color:gray;">Can we apply these methods in other high-frequency data sources? </span>
 
 
 ---
@@ -2086,7 +2086,7 @@ $\rightarrow$ Yes!
 - Can we identify someone from their walking pattern measured by a wrist-worn accelerometer in big, free-living datasets?
 - Can we accurately find walking and count steps in free-living datasets? 
 - <span style="color:gray;">Can we generalize conclusions from free-living accelerometry data to the US population?</span> 
-- <span style="color:gray;">Can we apply these methods in other, non-accelerometry datasets? </span>
+- <span style="color:gray;">Can we apply these methods in other high-frequency data sources? </span>
 
 
 
@@ -2096,9 +2096,10 @@ $\rightarrow$ Yes!
 
 ### Validation: identifying walking in free-living datasets
 
-+ Track down free-living datasets with wrist-worn accelerometry and gold standard step counts
-+ Find and implement open-source algorithms for step counting from wrist accelerometry
-+ Evaluate performance of algorithms 
++ **Search** for free-living datasets with wrist-worn accelerometry and gold standard step counts
+  + Free-living $\neq$ lab
++ **Implement** open-source algorithms for step counting from wrist accelerometry
++ **Evaluate** performance of algorithms 
 
 ---
 
@@ -2146,8 +2147,8 @@ step_acc %>%
 + $7$ days of wrist accelerometry
 + $10$Tb of data 
 + Over 1 year computation time 
-+ Open source pipeline 
-+ Open source data repository 
++ Open source processing pipeline 
++ Publicly available data repository 
 + **First** nationally representative estimate of steps in the US population using open source algorithms
 
 ![](figs/physionet.png){width=70%}
@@ -2187,7 +2188,7 @@ xdf %>%
     geom = "label",
     x = 15000,
     y = 2,
-    label = "Median daily steps <19 yrs: 9k",
+    label = "Median daily steps <18 yrs: 9k",
     hjust = 0,
     color = "#444444"
   )  +
@@ -2317,7 +2318,7 @@ dose_resp %>%
 <br>
 $\rightarrow$ Yes! 
 - <span style="color:gray;">Can we generalize conclusions from free-living accelerometry data to the US population?</span> 
-- <span style="color:gray;">Can we apply these methods in other, non-accelerometry datasets? </span>
+- <span style="color:gray;">Can we apply these methods in other high-frequency data sources? </span>
 
 
 ---
@@ -2334,7 +2335,7 @@ $\rightarrow$ Yes!
 <br>
 <span style="color:gray;">$\rightarrow$ Yes! </span>
 - Can we generalize conclusions from free-living accelerometry data to the US population?
-- <span style="color:gray;">Can we apply these methods in other, non-accelerometry datasets? </span>
+- <span style="color:gray;">Can we apply these methods in other high-frequency data sources? </span>
 
 
 
@@ -2607,7 +2608,7 @@ p1 +
 - Can we generalize conclusions from free-living accelerometry data to the US population?
 <br>
 $\rightarrow$ Yes! 
-- <span style="color:gray;">Can we apply these methods in other, non-accelerometry datasets? </span>
+- <span style="color:gray;">Can we apply these methods in other high-frequency data sources? </span>
 
 ---
 
@@ -2624,7 +2625,7 @@ $\rightarrow$ Yes!
 - <span style="color:gray;">Can we generalize conclusions from free-living accelerometry data to the US population?</span>
 <br>
 <span style="color:gray;">$\rightarrow$ Yes! </span>
-- <span style="color:gray;">Can we apply these methods in other, non-accelerometry datasets? </span>
+- <span style="color:gray;">Can we apply these methods in other high-frequency data sources? </span>
 
 
 
@@ -2738,7 +2739,7 @@ $\rightarrow$ Yes!
 - <span style="color:gray;">Can we generalize conclusions from free-living accelerometry data to the US population?</span>
 <br>
 <span style="color:gray;">$\rightarrow$ Yes! </span>
-- <span style="color:gray;">Can we apply these methods in other, non-accelerometry datasets? </span>
+- <span style="color:gray;">Can we apply these methods in other high-frequency data sources? </span>
 
 ---
 
@@ -2757,11 +2758,11 @@ $\rightarrow$ Yes!
 - <span style="color:gray;">Can we generalize conclusions from free-living accelerometry data to the US population?</span>
 <br>
 <span style="color:gray;">$\rightarrow$ Yes! </span>
-- Can we apply these methods in other, non-accelerometry datasets?
+- Can we apply these methods in other high-frequency data sources?
 
 
 
-# Can we apply these methods in other, non-accelerometry datasets?
+# Can we apply these methods in other high-frequency data sources?
 
 ---
 
@@ -3029,7 +3030,7 @@ mean_preds %>%
 - <span style="color:gray;">Can we generalize conclusions from free-living accelerometry data to the US population?</span>
 <br>
 <span style="color:gray;">$\rightarrow$ Yes! </span>
-- Can we apply these methods in other, non-accelerometry datasets?
+- Can we apply these methods in other high-frequency data sources?
 <br>
 $\rightarrow$ Yes!
 
