@@ -392,9 +392,9 @@ final_plot
 ```
 
 ## Outline {.question-bullets}
-
+<div style="font-size: 115%;">
 ::: {.incremental}
-<br>
+
 
 - Can we identify someone from their walking pattern measured by a wrist-worn accelerometer? *(Digital fingerprinting)*
 - Can we identify someone from their walking pattern measured by a wrist-worn accelerometer in big, free-living datasets? 
@@ -403,20 +403,20 @@ final_plot
 - Can we apply these methods in other high-frequency data sources? 
 :::
 
+</div>
+
 ---
 
+
 ## Outline {.question-bullets}
-
-<br>
-
+<div style="font-size: 115%;">
 - Can we identify someone from their walking pattern measured by a wrist-worn accelerometer? *(Digital fingerprinting)*
 - <span style="color:gray;">Can we identify someone from their walking pattern measured by a wrist-worn accelerometer in big, free-living datasets?</span>
 - <span style="color:gray;">Can we accurately find walking and count steps in free-living datasets? </span>
 - <span style="color:gray;">Can we generalize conclusions from free-living accelerometry data to the US population?</span> 
 - <span style="color:gray;">Can we apply these methods in other high-frequency data sources? </span>
 
-
-
+</div>
 # Can we identify someone from their walking pattern measured by a wrist-worn accelerometer?
 
 ---
@@ -670,11 +670,13 @@ plot_grid(p1, p2a, ncol = 2, align = "v", rel_widths = c(1,1))
 ---
 
 
-### Details of the method
 
+### Details of the method
 ::: {.incremental}
 
 **For each second and each person**: 
+<div style="font-size: 150%;">
+
 
 + Obtain joint distribution of acceleration and lag acceleration for a series of lags 
 
@@ -685,6 +687,8 @@ plot_grid(p1, p2a, ncol = 2, align = "v", rel_widths = c(1,1))
 + Intuition: walking is cyclic process. We want to leverage cyclic nature of walking.
   
 ::: 
+
+</div>
 
 --- 
 
@@ -728,8 +732,7 @@ p = ggplot() +
     aes(
       x = time,
       y = value,
-      color = variable,
-      linetype = variable
+      color = variable
     ),
     linewidth = .9
   ) +
@@ -744,10 +747,6 @@ p = ggplot() +
   ) +
   scale_color_manual(
     values = c("black", "darkgrey"),
-    labels = c("Acceleration", "0.15s lagged acceleration"),
-    name = ""
-  ) +   scale_linetype_manual(
-    values = c("solid", "dashed"),
     labels = c("Acceleration", "0.15s lagged acceleration"),
     name = ""
   ) +
@@ -789,8 +788,7 @@ p = ggplot() +
     aes(
       x = time,
       y = value,
-      color = variable,
-      linetype = variable
+      color = variable
     ),
     linewidth = .9
   ) +
@@ -805,10 +803,6 @@ p = ggplot() +
   ) +
   scale_color_manual(
     values = c("black", "darkgrey"),
-    labels = c("Acceleration", "0.15s lagged acceleration"),
-    name = ""
-  ) +   scale_linetype_manual(
-    values = c("solid", "dashed"),
     labels = c("Acceleration", "0.15s lagged acceleration"),
     name = ""
   ) +
@@ -880,8 +874,7 @@ p = ggplot() +
     aes(
       x = time,
       y = value,
-      color = variable,
-      linetype = variable
+      color = variable
     ),
     linewidth = .9
   ) +
@@ -896,10 +889,6 @@ p = ggplot() +
   ) +
   scale_color_manual(
     values = c("black", "darkgrey"),
-    labels = c("Acceleration", "0.15s lagged acceleration"),
-    name = ""
-  ) + scale_linetype_manual(
-    values = c("solid", "dashed"),
     labels = c("Acceleration", "0.15s lagged acceleration"),
     name = ""
   ) +
@@ -1055,6 +1044,9 @@ df %>%
 ### Derive predictors from joint distribution 
 
 ```{r jointdist0}
+#| cache: true
+
+
 df %>%
   ggplot() +
   annotate(geom = "rect", 
@@ -1545,7 +1537,7 @@ s1_dens %>% mutate(id = "Person A") %>%
   ggplot(aes(x=vm, y=lag_vm, color = density)) +
   geom_point(size = 0.9, alpha = 0.8) +
   facet_grid(id~lag) +
-  scale_color_viridis(name = "# points", option = "B") +
+  scale_color_viridis(name = "Density", option = "B") +
   labs(x = "Acceleration (g)", y = "Lagged Acceleration (g)") +
   scale_x_continuous(limits = c(0,3)) +
   scale_y_continuous(limits = c(0,3)) 
@@ -1724,6 +1716,9 @@ p4 + p3n + plot_layout(ncol = 2, widths = c(0.3, 1))
 ### Results 
 
 ```{r paper 1 res}
+#| cache: true 
+
+
 pred_df %>% 
   group_by(true_subject) %>% 
   mutate(max = max(prob)) %>% 
@@ -1734,13 +1729,15 @@ pred_df %>%
   theme(legend.position = "bottom",
         axis.ticks.x = element_blank(),
         panel.grid.major.x = element_blank(),
-        panel.grid.minor.x = element_blank()) +
+        panel.grid.minor.x = element_blank(),
+        legend.text = element_text(size = 14),
+        legend.title = element_text(size = 15)) +
   scale_color_manual(values = c("#CC79A7", "#009E73"),
                      labels = c("Models trained for other participants", "Model trained for correct participant"),
                      name = "Prediction from:") +
   labs(x = "Participant", y = "Predicted Probability",
        title = "100% rank-1 accuracy in 32 participants") +
-  guides(color = guide_legend(override.aes = list(size = 3, alpha = 1))) +
+  guides(color = guide_legend(override.aes = list(size = 4, alpha = 1))) +
   scale_y_continuous(breaks = seq(0, 1, 0.1), limits = c(-0.01, 1.01)) +
   annotate(geom = "text",
            color = "#444444",
@@ -1838,17 +1835,17 @@ v_2(1) & v_2(2) & v_2(3) & v_2(4) \\
 $$ 
 
 
-acceleration matrix $$\begin{bmatrix} v_1(2) & v_1(3) & v_1(4) & v_1(3) & v_1(4) & v_1(4) \\
-v_2(2) & v_2(3) & v_2(4) & v_2(3) & v_2(4) & v_2(4)  \\
+acceleration matrix $$\begin{bmatrix} \color{blue}{v_1(2)} & \color{blue}{v_1(3)} &  \color{blue}{v_1(4)} & \color{teal}{v_1(3)} & \color{teal}{v_1(4)} & \color{violet}{v_1(4)} \\
+\color{blue}{v_2(2)} & \color{blue}{v_2(3)} &  \color{blue}{v_2(4)} & \color{teal}{v_2(3)} & \color{teal}{v_2(4)} & \color{violet}{v_2(4)} \\
 \end{bmatrix}
 $$ 
-lag acceleration matrix $$\begin{bmatrix} v_1(1) & v_1(1) & v_1(1) & v_1(2) & v_1(2) & v_1(3) \\
-v_2(1) & v_2(1) & v_2(1) & v_2(2) & v_2(2) & v_2(3) \\
+lag acceleration matrix $$\begin{bmatrix} \color{blue}{v_1(1)} & \color{blue}{v_1(2)} & \color{blue}{v_1(3)} & \color{teal}{v_1(1)} & \color{teal}{v_1(2)} &\color{violet}{ v_1(1)} \\
+\color{blue}{v_2(1)} & \color{blue}{v_2(2)} & \color{blue}{v_2(3)} & \color{teal}{v_2(1)} & \color{teal}{v_2(2)} &\color{violet}{ v_2(1)} \\
 \end{bmatrix}
 $$ 
 
-lag matrix $$\begin{bmatrix} 1 & 2 & 3 & 1 & 2 & 1\\
-1 & 2 & 3 & 1 & 2 & 1\\\end{bmatrix}
+lag matrix $$\begin{bmatrix} \color{blue}{1} & \color{blue}{1} & \color{blue}{1} & \color{teal}{2} & \color{teal}{2} & \color{violet}{3}\\
+\color{blue}{1} & \color{blue}{1} & \color{blue}{1} & \color{teal}{2} & \color{teal}{2} & \color{violet}{3}\\\end{bmatrix}
 $$ 
 
 Number columns: $4 \cdot (4-1) / 2 = 6$ 
@@ -1962,7 +1959,10 @@ model = mgcv::gam(
 
 ---
 
+
 ### Connection between two methods 
+
+<div style="font-size: 150%;">
 
 ::: {.incremental}
 + Functional approach is generalization of grid cell approach 
@@ -1971,6 +1971,8 @@ model = mgcv::gam(
 + Both leverage same underlying structure: how acceleration, lag acceleration pairs characterize movement
 
 :::
+
+</div>
 
 ---
 
@@ -2047,9 +2049,7 @@ Two sessions at least 1 week apart
 ---
 
 ## Outline {.question-bullets}
-
-<br>
-
+<div style="font-size: 115%;">
 - Can we identify someone from their walking pattern measured by a wrist-worn accelerometer? *(Digital fingerprinting)*
 <br>
 $\rightarrow$ Yes! 
@@ -2057,13 +2057,12 @@ $\rightarrow$ Yes!
 - <span style="color:gray;">Can we accurately find walking and count steps in free-living datasets? </span>
 - <span style="color:gray;">Can we generalize conclusions from free-living accelerometry data to the US population?</span> 
 - <span style="color:gray;">Can we apply these methods in other high-frequency data sources? </span>
-
+</div>
 
 ---
 
 ## Outline {.question-bullets}
-
-<br>
+<div style="font-size: 115%;">
 
 - <span style="color:gray;">Can we identify someone from their walking pattern measured by a wrist-worn accelerometer? *(Digital fingerprinting)* </span>
 <br>
@@ -2073,13 +2072,11 @@ $\rightarrow$ Yes!
 - <span style="color:gray;">Can we generalize conclusions from free-living accelerometry data to the US population?</span> 
 - <span style="color:gray;">Can we apply these methods in other high-frequency data sources? </span>
 
-
+</div>
 ---
 
 ## Outline {.question-bullets}
-
-<br>
-
+<div style="font-size: 115%;">
 - <span style="color:gray;">Can we identify someone from their walking pattern measured by a wrist-worn accelerometer? *(Digital fingerprinting)* </span>
 <br>
 <span style="color:gray;">$\rightarrow$ Yes! </span>
@@ -2088,24 +2085,27 @@ $\rightarrow$ Yes!
 - <span style="color:gray;">Can we generalize conclusions from free-living accelerometry data to the US population?</span> 
 - <span style="color:gray;">Can we apply these methods in other high-frequency data sources? </span>
 
-
+</div>
 
 # Can we accurately find walking and count steps in free-living datasets?
 
 ---
 
+
 ### Validation: identifying walking in free-living datasets
 
+<div style="font-size: 150%;">
 + **Search** for free-living datasets with wrist-worn accelerometry and gold standard step counts
   + Free-living $\neq$ lab
 + **Implement** open-source algorithms for step counting from wrist accelerometry
 + **Evaluate** performance of algorithms 
+</div>
 
 ---
 
 ### Validation: identifying walking in free-living datasets
 
-5 open-source algorithms, 3 datasets with gold-standard step counts 
+Open-source algorithms and 3 datasets with gold-standard step counts 
 
 ```{r algo compare}
 #| cache: true
@@ -2129,6 +2129,15 @@ step_acc %>%
   theme(legend.position = "none") + 
   scale_x_discrete(labels = c("Self-Supervised Learner +\nPeak Finding", "Random Forest +\nPeak Finding", "Frequency Domain", "Peak Finding with\n Thresholds")) +
   labs(x = "Algorithm Type", y = "Absolute Percent Error", title = "Step Count Accuracy Across Algorithms") +
+  annotate(geom = "segment",
+           x = 0.65, xend = 0.65, y = 75, yend = 45,
+    arrow = arrow(length = unit(0.1, "inches"), type = "closed"),
+    color = "#5CB85C",
+    linewidth = 1.1
+  ) +
+  annotate(geom = "label", 
+           x = 0.65, y = 45, label = "Lower = better", angle = 90,
+           vjust = -1, hjust = 0) +
   scale_y_continuous(limits=c(0, 75), breaks = seq(0,75,15)) +
   geom_label(data = median_df, 
              aes(x = algorithm, y = med, label = round(med)))
@@ -2158,7 +2167,7 @@ step_acc %>%
 
 ### Application: idenfiying walking and counting steps in NHANES 
 
-How many steps does the average American take per day?
+How many average daily steps do Americans take?
 
 ```{r ridges}
 #| cache: true 
@@ -2177,18 +2186,18 @@ xdf %>%
   select(age_cat, steps = total_scsslsteps) %>% 
   ggplot(aes(x = steps, y = age_cat, fill = after_stat(x))) +
   geom_density_ridges_gradient(scale = 3, quantile_lines = TRUE, quantiles = 2) +
-  scale_fill_viridis_c(option = "B", name = "Mean daily steps per day, estimated by Self-Supervised Learner") +
+  scale_fill_viridis_c(option = "B", name = "") +
   scale_x_continuous(limits=c(0,25000),
                      labels = seq(0, 30, 5),
                      breaks = seq(0, 30000, 5000)) +
   scale_y_discrete(labels = c("<18", "18-29", "30-39", "40-49", "50-59", "60-69", "70+")) +
   theme(legend.position = "none") + 
-  labs(x = "Mean Steps per Day (x1000); Estimated by Self-Supervised Learner", y = "Age category") +
+  labs(x = "Average Daily Steps (x1000); Estimated by Self-Supervised Learner", y = "Age category") +
   annotate(
     geom = "label",
     x = 15000,
     y = 2,
-    label = "Median daily steps <18 yrs: 9k",
+    label = "Median average steps <18 yrs: 9k",
     hjust = 0,
     color = "#444444"
   )  +
@@ -2202,7 +2211,7 @@ xdf %>%
     geom = "label",
     x = 8000,
     y = 9,
-    label = "Median daily steps 70+ yrs: 5k",
+    label = "Median average steps 70+ yrs: 5k",
     hjust = 0,
     color = "#444444"
   )  +
@@ -2258,7 +2267,7 @@ xdf %>%
                      labels = seq(0, 30, 5),
                      breaks = seq(0, 30000, 5000))  +
   scale_y_discrete(labels = c("Self-Supervised Learner +\nPeak Finding", "Random Forest +\nPeak Finding", "Frequency Domain", "Peak Finding with\n Thresholds")) +
-  labs(x = "Mean Steps per Day (x1000)", y = "",
+  labs(x = "Average Daily Steps (x1000)", y = "",
        title = "Step Distributions by Algorithm and Age",
        subtitle = "Median steps can differ by over 30% between algorithms") +
   theme(legend.position = "none") +
@@ -2308,7 +2317,7 @@ dose_resp %>%
 
 ## Outline {.question-bullets}
 
-<br>
+<div style="font-size: 115%;">
 
 - <span style="color:gray;">Can we identify someone from their walking pattern measured by a wrist-worn accelerometer? *(Digital fingerprinting)* </span>
 <br>
@@ -2320,13 +2329,12 @@ $\rightarrow$ Yes!
 - <span style="color:gray;">Can we generalize conclusions from free-living accelerometry data to the US population?</span> 
 - <span style="color:gray;">Can we apply these methods in other high-frequency data sources? </span>
 
+</div>
 
 ---
 
 ## Outline {.question-bullets}
-
-<br>
-
+<div style="font-size: 115%;">
 - <span style="color:gray;">Can we identify someone from their walking pattern measured by a wrist-worn accelerometer? *(Digital fingerprinting)* </span>
 <br>
 <span style="color:gray;">$\rightarrow$ Yes! </span>
@@ -2336,7 +2344,7 @@ $\rightarrow$ Yes!
 <span style="color:gray;">$\rightarrow$ Yes! </span>
 - Can we generalize conclusions from free-living accelerometry data to the US population?
 - <span style="color:gray;">Can we apply these methods in other high-frequency data sources? </span>
-
+</div>
 
 
 
@@ -2371,12 +2379,14 @@ steps_summ %>%
 
 ### Function on scalar regression 
 
+<div style="font-size: 115%;">
+
 ::: {.incremental}
 + Outcome: steps profile over the course of the day (function) 
 
 + Predictors: age, sex (scalars)
 
-+ Model: $$\mathbb{E}[\mathrm{steps}_i(s)] = \beta_0(s) + \beta_1(s)\mathrm{sex}_i + \beta_2(s)\mathrm{age}_i $$ 
++ Model: $$\mathbb{E}[\mathrm{steps}_i(s)] = \beta_0(s) + \beta_1(s)I\{\mathrm{sex}_i=\mathrm{female}\} + \beta_2(s)\mathrm{age}_i $$ 
 $i$: participant; 
 $s \in \{1, \dots, 1440\}$: each minute of the day
 
@@ -2385,6 +2395,7 @@ $s \in \{1, \dots, 1440\}$: each minute of the day
   + $\beta_1(s)$: change in steps for females compared to males, holding age constant 
   + Can be interpreted at specific points of the day (e.g., how many more steps do males take at 12pm?) 
 
+</div>
 :::
 
 ---
@@ -2392,44 +2403,70 @@ $s \in \{1, \dots, 1440\}$: each minute of the day
 ### Function on scalar regression: implementation 
 ::: {.incremental}
 
+<div style="font-size: 95%;">
 + Fast univariate inference (FUI) [@Cui2021]
 
 + Fit separate (univariate) GLM at each point $s$, smooth the resulting point estimates 
 
 + Bootstrap subjects to get confidence bands 
 
+</div>
+
+:::
+
+---
+
+### Function on scalar regression: implementation 
+
+<div style="font-size: 95%;">
+
++ Fast univariate inference (FUI) [@Cui2021]
+
++ Fit separate (univariate) GLM at each point $s$, smooth the resulting point estimates 
+
++ Bootstrap subjects to get confidence bands 
 
 + <span style="color:red;">BUT: NHANES is not a simple random sample</span>
 
-  + Individuals are sampled in geographic clusters
+![](figs/sample_design.gif)
 
-  + Minority groups are oversampled 
++ Individuals sampled in geographic clusters, minority groups oversampled 
 
-+ Are our estimates valid for population-level inference? 
++ Are estimates valid for population-level inference? 
 
-:::
+</div>
+
+<div style=" position: absolute; bottom: 0em; right: -4em; font-size: 0.6em; color: #777; "> [NHANES Sample Design Tutorial](https://wwwn.cdc.gov/nchs/nhanes/tutorials/sampledesign.aspx) </div>
+
 
 ---
 
 
 ### Survey function on scalar regression 
+
+<div style="font-size: 135%;">
+
+
 ::: {.incremental}
 
-+ For standard regression, well developed methods and software exist that take into accounts weights and correlation between clusters (e.g. $\texttt{svyglm}$, $\texttt{svycoxph}$) [@surveys]
++ **No** method exists for survey-weighted function on scalar regression 
 
++ Standard regression, well developed methods and software to take into accounts weights and correlation between clusters (e.g. $\texttt{svyglm}$, $\texttt{svycoxph}$) [@surveys]
 
-+ No such methods for function on scalar regression 
 
 + FUI built on separate GLMS
 
 + **Idea**: incorporate survey weights into the GLMs and use survey-aware replication/bootstrap methods for inference 
+
 :::
+
+</div>
 
 ---
 
 ### Survey function on scalar regression: simulation 
 ::: {.incremental}
-First ever simulation study to evaluate function on scalar regression in complex survey settings 
+**First** simulation study to evaluate function on scalar regression in complex survey settings 
 
 + **Generate** superpopulation 
   + Each individual has functional outcome and covariate
@@ -2456,7 +2493,9 @@ First ever simulation study to evaluate function on scalar regression in complex
 ```{r survey sim res}
 #| cache: true 
 p1 = res_g %>% 
-  filter(boot_type %in% c("Weighted","Unweighted")) %>%
+  filter(boot_type != "RWYB") %>%
+  mutate(boot_type = if_else(boot_type == "BRR", "BRR*", boot_type)) %>% 
+  mutate(boot_type = factor(boot_type, levels = c("Unweighted", "Weighted", "BRR*"))) %>% 
   ggplot(aes(x= boot_type, y = lMISE, color = boot_type, fill = boot_type))+
   facet_wrap(. ~ var) +
   geom_boxplot(
@@ -2473,14 +2512,13 @@ p1 = res_g %>%
                aes(shape = boot_type),
                size = 2,
                position = position_dodge(width = 0.75)) +
-  theme(palette.color.discrete = c("#E69F00", "#56B4E9")) +
+  theme(palette.color.discrete = c("#E69F00", "#56B4E9", "#009E73FF")) +
   theme_sub_legend(position = "none") +
   theme_sub_panel(grid.major.x = element_blank(),
                   grid.minor.x = element_blank()) +
   theme_sub_axis_x(text = element_text(angle = 20)) + 
   labs(x = "Estimation Type", y = expression(log[10]~"Mean Integrated Squared Error"), color = "Estimation Type", fill = "Estimation Type", shape = "Estimation Type", title = "Bias") +
-  scale_shape_manual(values = c(1, 8))
-
+  scale_shape_manual(values = c(1, 8, 5))
 
 p2 = res_g %>% 
   filter(boot_type != "RWYB") %>% 
@@ -2508,11 +2546,13 @@ p2 = res_g %>%
   theme_sub_panel(grid.major.x = element_blank(),
                   grid.minor.x = element_blank()) +
   labs(x = "Inference Type", y = "Pointwise Coverage", color = "Estimation Type", fill = "Estimation Type", shape = "Estimation Type", title = "Coverage") +
-  scale_shape_manual(values = c(1, 8, 5, 7)) +
+  scale_shape_manual(values = c(1, 8, 5)) +
   scale_y_continuous(breaks=c(0, .25, .5, .75, .95, 1)) +
   geom_hline(aes(yintercept = .95), color = "#CC79A7", linetype = "dashed")
 
-p1 + p2 + plot_layout(widths = c(.7, 1)) + plot_annotation(caption = "*Balanced Repeated Replication: bootstrap method that accounts for within- stratum correlation")
+# p1 + p2 + plot_layout(widths = c(.7, 1)) + plot_annotation(caption = "*Balanced Repeated Replication: bootstrap method that accounts for within- stratum correlation")
+p1 + p2 + plot_annotation(caption = "*Balanced Repeated Replication: bootstrap method that accounts for within- stratum correlation")
+
 ```
 
 <div style=" position: absolute; bottom: 0.5em; right: -4em; font-size: 0.7em; color: #777; "> @surveyfosr </div>
@@ -2538,6 +2578,7 @@ model_fit = svyfosr::svyfui(steps_mat ~ age + sex,
 ```
 
 </div>
+![](figs/logo.png){width=25%}
 <div style=" position: absolute; bottom: 0.5em; right: -4em; font-size: 0.7em; color: #777; "> @svy_package </div>
 
 ---
@@ -2585,9 +2626,9 @@ p1 +
   geom_ribbon(aes(x = s, ymin = lower, ymax = upper, fill = model), alpha = .5) +
   geom_line(aes(color = model), linewidth = 1.2)  +
   scale_fill_manual(values = c("#E69F00", "#009E73FF"), name = "Model",
-                    labels = c("Unweighted", "Weighted + BRR inference")) +
+                    labels = c("Unweighted", "BRR")) +
   scale_color_manual(values = c("#E69F00", "#009E73FF"), name = "Model",
-                    labels = c("Unweighted", "Weighted + BRR inference")) 
+                    labels = c("Unweighted", "BRR")) 
   
 ```
 
@@ -2595,9 +2636,7 @@ p1 +
 
 
 ## Outline {.question-bullets}
-
-<br>
-
+<div style="font-size: 115%;">
 - <span style="color:gray;">Can we identify someone from their walking pattern measured by a wrist-worn accelerometer? *(Digital fingerprinting)* </span>
 <br>
 <span style="color:gray;">$\rightarrow$ Yes! </span>
@@ -2609,12 +2648,12 @@ p1 +
 <br>
 $\rightarrow$ Yes! 
 - <span style="color:gray;">Can we apply these methods in other high-frequency data sources? </span>
+</div>
 
 ---
 
 ## Outline {.question-bullets}
-<br>
-
+<div style="font-size: 115%;">
 - <span style="color:gray;">Can we identify someone from their walking pattern measured by a wrist-worn accelerometer? *(Digital fingerprinting)* </span>
 <br>
 <span style="color:gray;">$\rightarrow$ Yes! </span>
@@ -2626,7 +2665,7 @@ $\rightarrow$ Yes!
 <br>
 <span style="color:gray;">$\rightarrow$ Yes! </span>
 - <span style="color:gray;">Can we apply these methods in other high-frequency data sources? </span>
-
+</div>
 
 
 # Can we identify someone from their walking pattern measured by a wrist-worn accelerometer in big, free-living datasets?
@@ -2635,15 +2674,18 @@ $\rightarrow$ Yes!
 
 ### Digital fingerprinting in NHANES 
 
+<div style="font-size: 125%;">
+
 - Use highly specific method to identify walking in NHANES (minimize false positives) [@Karas2019]
 - $N = 13{,}000$ individuals with 3 minutes walking per person 
 - 3:1 train/test split 
 - Logistic regression + weighting to overcome class imbalance
-- 43\% rank-1 accuracy 
-- 73\% rank-5 accuracy
-- 97\% rank-1\% accuracy (correct subject is in the top 130 predictions)
-- 100\% rank-5\% accuracy (correct subject is in the top 650 predictions)
+- <span style="color:#009E73;">43\%</span> rank-1 accuracy 
+- <span style="color:#009E73;">73\%</span> rank-5 accuracy
+- <span style="color:#009E73;">97\%</span> rank-1\% accuracy (correct subject is in the top 130 predictions)
+- <span style="color:#009E73;">100\%</span> rank-5\% accuracy (correct subject is in the top 650 predictions)
 
+</div>
 ---
 
 
@@ -2654,22 +2696,21 @@ $\rightarrow$ Yes!
 #| cache: true
 p1 = dens_df %>%
   filter(id == 78898) %>%
-  mutate(data = factor(data, levels = c("train", "test"), labels = c("Training data", "Testing data"))) %>%
+  mutate(data = factor(data, levels = c("train", "test"), labels = c("Training", "Testing"))) %>%
   ggplot(aes(x = vm, y = lag_vm, color = density)) +
   geom_point(size = .85) +
-  scale_color_viridis_b(name = "# points", option = "B") +
+  scale_color_viridis_b(name = "Density", option = "B") +
   facet_grid(data~.) +
   labs(x = "Acceleration (g)", y = "Lag Acceleration (g)") +
-  scale_x_continuous(limits=c(0,3), breaks=seq(0, 3, 0.5)) +
-  scale_y_continuous(limits=c(0,3), breaks=seq(0, 3, 0.5)) +
+  scale_x_continuous(limits=c(0,3), breaks=seq(0, 3, 1)) +
+  scale_y_continuous(limits=c(0,3), breaks=seq(0, 3, 1)) +
   theme(legend.position = c(0.9, 0.7),
         panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank(),
-        strip.text = element_text(color = "white", size = 11))
+        panel.grid.minor = element_blank())
 
 p2 = sample_dat2 %>%
   filter(id == 78898) %>%
-  mutate(data = factor(data, levels = c("train", "test"), labels = c("Training data", "Testing data"))) %>%
+  mutate(data = factor(data, levels = c("train", "test"), labels = c("Training", "Testing"))) %>%
   group_by(data) %>%
   mutate(row = row_number()) %>%
   filter(row <= 800) %>%
@@ -2678,31 +2719,29 @@ p2 = sample_dat2 %>%
   geom_line() +
   facet_grid(data~.) +
   scale_x_continuous(breaks=seq(0, 800, 80), labels = seq(0, 10, 1)) +
-  scale_y_continuous(limits=c(0, 2.5)) +
+  scale_y_continuous(limits=c(0, 2.5), breaks = seq(0, 2, 1)) +
   labs(x = "Time (sec)", y = "Acceleration (g)") +
   theme(panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank(),
-        strip.text = element_text(color = "white", size = 11))
+        panel.grid.minor = element_blank())
 
 
 p3 = dens_df %>%
   filter(id == 68561) %>%
-  mutate(data = factor(data, levels = c("train", "test"), labels = c("Training data", "Testing data"))) %>%
+  mutate(data = factor(data, levels = c("train", "test"), labels = c("Training", "Testing"))) %>%
   ggplot(aes(x = vm, y = lag_vm, color = density)) +
   geom_point(size = .85) +
-  scale_color_viridis_b(option = "B", name = "# points") +
+  scale_color_viridis_b(option = "B", name = "Density") +
   facet_grid(data~.) +
   labs(x = "Acceleration (g)", y = "Lag Acceleration (g)") +
-  scale_x_continuous(limits=c(0,3), breaks=seq(0, 3, 0.5)) +
-  scale_y_continuous(limits=c(0,3), breaks=seq(0, 3, 0.5)) +
+  scale_x_continuous(limits=c(0,3), breaks=seq(0, 3, 1)) +
+  scale_y_continuous(limits=c(0,3), breaks=seq(0, 3, 1)) +
   theme(legend.position = c(0.9, 0.7),
         panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank(),
-        strip.text = element_text(color = "white", size = 11))
+        panel.grid.minor = element_blank())
 
 p4 = sample_dat2 %>%
   filter(id == 68561) %>%
-  mutate(data = factor(data, levels = c("train", "test"), labels = c("Training data", "Testing data"))) %>%
+  mutate(data = factor(data, levels = c("train", "test"), labels = c("Training", "Testing"))) %>%
   group_by(data) %>%
   mutate(row = row_number()) %>%
   filter(row <= 800) %>%
@@ -2711,11 +2750,10 @@ p4 = sample_dat2 %>%
   geom_line() +
   facet_grid(data~.) +
   scale_x_continuous(breaks=seq(0, 800, 80), labels = seq(0, 10, 1)) +
-  scale_y_continuous(limits=c(0,2.5)) +
+  scale_y_continuous(limits=c(0,2.5), breaks = seq(0, 2, 1)) +
   labs(x = "Time (sec)", y = "Acceleration (g)") +
   theme(panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank(),
-        strip.text = element_text(color = "white", size = 11))
+        panel.grid.minor = element_blank())
 
 (p2 + p1) / (p4 + p3)
 ```
@@ -2725,8 +2763,7 @@ p4 = sample_dat2 %>%
 ---
 
 ## Outline {.question-bullets}
-<br>
-
+<div style="font-size: 115%;">
 - <span style="color:gray;">Can we identify someone from their walking pattern measured by a wrist-worn accelerometer? *(Digital fingerprinting)* </span>
 <br>
 <span style="color:gray;">$\rightarrow$ Yes! </span>
@@ -2740,12 +2777,12 @@ $\rightarrow$ Yes!
 <br>
 <span style="color:gray;">$\rightarrow$ Yes! </span>
 - <span style="color:gray;">Can we apply these methods in other high-frequency data sources? </span>
+</div>
 
 ---
 
 ## Outline {.question-bullets}
-<br>
-
+<div style="font-size: 115%;">
 - <span style="color:gray;">Can we identify someone from their walking pattern measured by a wrist-worn accelerometer? *(Digital fingerprinting)* </span>
 <br>
 <span style="color:gray;">$\rightarrow$ Yes! </span>
@@ -2759,7 +2796,7 @@ $\rightarrow$ Yes!
 <br>
 <span style="color:gray;">$\rightarrow$ Yes! </span>
 - Can we apply these methods in other high-frequency data sources?
-
+</div>
 
 
 # Can we apply these methods in other high-frequency data sources?
@@ -2798,7 +2835,7 @@ $\rightarrow$ Yes!
 ::: {.column width="50%"}
 
 
-![](figs/abp.png){.equalheight}
+![](figs/abp4.png){.equalheight}
 :::
 
 ::::
@@ -2897,7 +2934,7 @@ pt1 = dens_df %>%
   ggplot(aes(x=abp, y = lag_abp, group = time, color = density)) +
   facet_grid(lag~.) +
   geom_point(size = .5, alpha = .1) +
-  scale_color_viridis(name = "# points", option = "B") +
+  scale_color_viridis(name = "Density", option = "B") +
   labs(x = "ABP (mmHg)", y = "Lag ABP (mmHg)", title = "Fingerprint",  subtitle = "Patient 1") +
   scale_x_continuous(limits = c(40,150)) +
   scale_y_continuous(limits = c(40,150)) 
@@ -2958,7 +2995,7 @@ pt2 = dens_df %>%
   ggplot(aes(x=abp, y = lag_abp, group = time, color = density)) +
   facet_grid(lag~.) +
   geom_point(size = .5, alpha = .1) +
-  scale_color_viridis(name = "# points", option = "B") +
+  scale_color_viridis(name = "Density", option = "B") +
   labs(x = "ABP (mmHg)", y = "Lag ABP (mmHg)", title = "Fingerprint",  subtitle = "Patient 2") +
   scale_x_continuous(limits = c(40, 150)) +
   scale_y_continuous(limits = c(40, 150))
@@ -2971,11 +3008,14 @@ pt1 + pt2
 
 ### Fingerprinting with arterial waveform
 
-+ Obtain predictors for many different lags and cut points
-+ Use predictors that are top 10 contributors to first 30 PCs ($\approx 100$ predictors)
-+ Fit XGBoost model on 727 patients
-+ Mean (SD)  $7 (1.8)$ minutes per patient, range $3$-$16$ minutes
+<div style="font-size: 150%;">
 
++ Obtain predictors for many different lags and cut points
++ Use predictors that are top 10 contributors to first 30 PCs ($\approx$ 100 predictors)
++ Fit XGBoost model on 727 patients
++ Mean (SD)  7 (1.8) minutes per patient, range 3-16 minutes
+
+</div>
 
 ---
 
@@ -2991,14 +3031,16 @@ mean_preds %>%
   theme(legend.position = "bottom",
         axis.text.x = element_blank(),
         panel.grid.major.x = element_blank(),
-        panel.grid.minor.x = element_blank()) +
+        panel.grid.minor.x = element_blank(),
+        legend.text = element_text(size = 14),
+        legend.title = element_text(size = 15)) +
   scale_color_manual(values = c("#CC79A7", "#009E73"),
                      labels = c("Models trained for other patients", "Model trained for correct patient"),
                      name = "Prediction from:") + 
   labs(x = "Patient", y = "Predicted Probability",
        title = "Predicted Probabilities from XGBoost Model",
        subtitle = "94% rank-1, 99% rank-5 accuracy on test set") +
-  guides(color = guide_legend(override.aes = list(size = 3, alpha = 1))) +
+  guides(color = guide_legend(override.aes = list(size = 4, alpha = 1))) +
   scale_y_continuous(breaks = seq(0, 0.7, 0.1)) +
   annotate(geom = "text",
            color = "#444444",
@@ -3016,8 +3058,7 @@ mean_preds %>%
 ---
 
 ## Outline {.question-bullets}
-<br>
-
+<div style="font-size: 115%;">
 - <span style="color:gray;">Can we identify someone from their walking pattern measured by a wrist-worn accelerometer? *(Digital fingerprinting)* </span>
 <br>
 <span style="color:gray;">$\rightarrow$ Yes! </span>
@@ -3033,31 +3074,39 @@ mean_preds %>%
 - Can we apply these methods in other high-frequency data sources?
 <br>
 $\rightarrow$ Yes!
-
+</div>
 
 
 ---
 
 ## Future Directions 
+<div style="font-size: 150%;">
+
 ::: {.incremental}
-+ Using changes in fingerprint (both walking and waveform) to predict changes in function
-+ Designing real-time interventions based on hemodynamics patterns
-+ Extending survey FoSR to longitudinal outcomes 
++ Changes in fingerprint (both walking and waveform) to predict changes in function
++ Designing real-time interventions based on arterial waveform during surgery
++ Extending survey function on scalar regression to longitudinal outcomes 
 + Standardizing processing and analysis pipelines for wearable accelerometry 
 
 :::
+
+</div>
 
 ---
 
 ## Thank you!
 
-
 <br>
+<div style="font-size: 150%;">
 
-- Link to slides: [https://lilykoff.github.io/job_talk2025](lilykoff.github.io/job_talk2025) 
+- Link to slides: [tinyurl.com/kofftalk](tinyurl.com/kofftalk) 
 - Email: [lkoffma2@jh.edu](lkoffma2@jh.edu)
 - Website: [lilykoff.com](lilykoff.com)
 - Github: [github.com/lilykoff](github.com/lilykoff)
+</div>
+<br>
+
+![](figs/qr_code_nourl.png){width=35%}
 
 ---
 

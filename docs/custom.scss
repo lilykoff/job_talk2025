@@ -120,7 +120,7 @@ $presentation-font-size-root: 32px;
   display: inline-block;
 }
 .reveal .gif-stack {
-  max-height: 45vh;
+  max-height: 35vh;
   width: auto;
   display: block;
   margin-left: auto;
@@ -139,4 +139,10 @@ $presentation-font-size-root: 32px;
   font-weight: bold;      /* bold ? only */
   font-size: 1.5em;       /* make ? bigger */
   color: black;         /* pick from your palette */
+}
+
+
+.fit {
+  font-size: calc(1.2vw + 1.2vh);
+  line-height: 1.1;
 }
