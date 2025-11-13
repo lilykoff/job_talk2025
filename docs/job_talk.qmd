@@ -1736,8 +1736,8 @@ pred_df %>%
         panel.grid.major.x = element_blank(),
         panel.grid.minor.x = element_blank()) +
   scale_color_manual(values = c("#CC79A7", "#009E73"),
-                     labels = c("No", "Yes"),
-                     name = "Correct Participant") + 
+                     labels = c("Models trained for other participants", "Model trained for correct participant"),
+                     name = "Prediction from:") +
   labs(x = "Participant", y = "Predicted Probability",
        title = "100% rank-1 accuracy in 32 participants") +
   guides(color = guide_legend(override.aes = list(size = 3, alpha = 1))) +
@@ -1820,58 +1820,8 @@ $$\begin{bmatrix} v_1(1) & v_1(2) & v_1(3) & v_1(4) \\
 v_2(1) & v_2(2) & v_2(3) & v_2(4) \\
 \end{bmatrix}
 $$ 
-</div>
 
 ---
-
-
-### Functional regression approach 
-<div style="font-size: 80%;">
-
-**Toy example**: 4 observations per second, 2 seconds, 1 individual
-
-$v_1(2)$: 2nd acceleration observation in second 1
-
-data $$\begin{bmatrix} v_1(1) & v_1(2) & v_1(3) & v_1(4) \\
-v_2(1) & v_2(2) & v_2(3) & v_2(4) \\
-\end{bmatrix}
-$$ 
-
-acceleration matrix $$\begin{bmatrix} v_1(2) & v_1(3) & v_1(4) & v_1(3) & v_1(4) & v_1(4) \\
-v_2(2) & v_2(3) & v_2(4) & v_2(3) & v_2(4) & v_2(4)  \\
-\end{bmatrix}
-$$ 
-</div>
-
----
-
-### Functional regression approach 
-
-<div style="font-size: 80%;">
-
-**Toy example**: 4 observations per second, 2 seconds, 1 individual
-
-$v_1(2)$: 2nd acceleration observation in second 1
-
-data $$\begin{bmatrix} v_1(1) & v_1(2) & v_1(3) & v_1(4) \\
-v_2(1) & v_2(2) & v_2(3) & v_2(4) \\
-\end{bmatrix}
-$$ 
-
-
-acceleration matrix $$\begin{bmatrix} v_1(2) & v_1(3) & v_1(4) & v_1(3) & v_1(4) & v_1(4) \\
-v_2(2) & v_2(3) & v_2(4) & v_2(3) & v_2(4) & v_2(4)  \\
-\end{bmatrix}
-$$ 
-lag acceleration matrix $$\begin{bmatrix} v_1(1) & v_1(1) & v_1(1) & v_1(2) & v_1(2) & v_1(3) \\
-v_2(1) & v_2(1) & v_2(1) & v_2(2) & v_2(2) & v_2(3) \\
-\end{bmatrix}
-$$ 
-
-</div>
----
-
-
 
 ### Functional regression approach
 
@@ -1900,6 +1850,8 @@ $$
 lag matrix $$\begin{bmatrix} 1 & 2 & 3 & 1 & 2 & 1\\
 1 & 2 & 3 & 1 & 2 & 1\\\end{bmatrix}
 $$ 
+
+Number columns: $4 \cdot (4-1) / 2 = 6$ 
 </div>
 
 ---
@@ -2004,10 +1956,21 @@ model = mgcv::gam(
 
 + $\texttt{k = c(5, 5, 5)}$ number of basis functions for each dimension of the tensor product smooth
 
-+ $\texttt{weight\_mat}$: matrix of weights of linear functionals of smooth terms. We use equal weights so the $i,j^{\mathrm{th}}$ entry is $\texttt{1/nrow(accel\_mat)}$
++ $\texttt{weight\_mat}$: matrix of weights of linear functionals of smooth terms. We use equal weights so the $i,j^{\mathrm{th}}$ entry is $\texttt{1/ncol(accel\_mat)}$
 
 + $\texttt{method="REML"}$: smoothing parameter selection with restricted maximum likelihood 
 
+---
+
+### Connection between two methods 
+
+::: {.incremental}
++ Functional approach is generalization of grid cell approach 
++ Instead of discretizing space into cells, relationship between acceleration, lag acceleration, lag length is modeled as smooth, continuous surface $F$
++ Grid cell approach: piecewise constant approximation of $F$
++ Both leverage same underlying structure 
+
+:::
 
 ---
 
@@ -2185,7 +2148,7 @@ step_acc %>%
 + Over 1 year computation time 
 + Open source pipeline 
 + Open source data repository 
-+ **First** nationally representative estimate of steps in the US population
++ **First** nationally representative estimate of steps in the US population using open source algorithms
 
 ![](figs/physionet.png){width=70%}
 <div style=" position: absolute; bottom: 0.5em; right: -4em; font-size: 0.7em; color: #777; "> @physionet </div>
@@ -3029,8 +2992,8 @@ mean_preds %>%
         panel.grid.major.x = element_blank(),
         panel.grid.minor.x = element_blank()) +
   scale_color_manual(values = c("#CC79A7", "#009E73"),
-                     labels = c("No", "Yes"),
-                     name = "Correct Participant") + 
+                     labels = c("Models trained for other patients", "Model trained for correct patient"),
+                     name = "Prediction from:") + 
   labs(x = "Patient", y = "Predicted Probability",
        title = "Predicted Probabilities from XGBoost Model",
        subtitle = "94% rank-1, 99% rank-5 accuracy on test set") +
