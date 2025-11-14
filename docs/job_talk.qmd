@@ -3,14 +3,14 @@ title: "Methods and Applications for High-Frequency Biosignals Data"
 title-slide-attributes:
     data-background-image: figs/qr_code.png
     data-background-size: 20%
-    data-background-position: 95% 95%
+    data-background-position: 90% 90%
 subtitle: ""
 author: "Lily Koffman"
 institute: "Department of Biostatistics, Johns Hopkins School of Public Health" 
 format:
   revealjs:
     theme: custom.scss
-    slide-number: false
+    slide-number: true
     toc: false
     progress: true
     hash: true
@@ -44,6 +44,7 @@ library(scales)
 library(ggplot2)
 library(ggrepel)
 library(broom)
+library(mgcv)
 library(survival)
 library(ggimage)
 library(cowplot)
@@ -398,8 +399,8 @@ final_plot
 
 - Can we identify someone from their walking pattern measured by a wrist-worn accelerometer? *(Digital fingerprinting)*
 - Can we identify someone from their walking pattern measured by a wrist-worn accelerometer in big, free-living datasets? 
-- Can we accurately find walking and count steps in free-living datasets? 
-- Can we generalize conclusions from free-living accelerometry data to the US population? 
+  - Can we accurately find walking and count steps in free-living datasets? 
+  - Can we generalize conclusions from free-living accelerometry data to the US population? 
 - Can we apply these methods in other high-frequency data sources? 
 :::
 
@@ -412,8 +413,8 @@ final_plot
 <div style="font-size: 115%;">
 - Can we identify someone from their walking pattern measured by a wrist-worn accelerometer? *(Digital fingerprinting)*
 - <span style="color:gray;">Can we identify someone from their walking pattern measured by a wrist-worn accelerometer in big, free-living datasets?</span>
-- <span style="color:gray;">Can we accurately find walking and count steps in free-living datasets? </span>
-- <span style="color:gray;">Can we generalize conclusions from free-living accelerometry data to the US population?</span> 
+  - <span style="color:gray;">Can we accurately find walking and count steps in free-living datasets? </span>
+  - <span style="color:gray;">Can we generalize conclusions from free-living accelerometry data to the US population?</span> 
 - <span style="color:gray;">Can we apply these methods in other high-frequency data sources? </span>
 
 </div>
@@ -1546,6 +1547,14 @@ s1_dens %>% mutate(id = "Person A") %>%
 
 ---
 
+### Fingerprints summarize predictors for a given lag and are different across individuals
+
+<img src="figs/time_series2.gif" class="gif-inline">
+<img src="figs/fingerprint2.gif" class="gif-inline">
+
+---
+
+
 ### Ready to fit models
 
 
@@ -1713,6 +1722,19 @@ p4 + p3n + plot_layout(ncol = 2, widths = c(0.3, 1))
 
 ---
 
+### Data 
+
+
+<div style="font-size: 150%;">
++ N = 32
++ 6 minutes of walking each
++ 3:1 train/test split 
+
+</div>
+
+![@iu_dat](figs/iu_data.png){width=50%, fig-align="left"}
+
+---
 
 ### Results 
 
@@ -1806,6 +1828,7 @@ Hat tip to [Edward Gunning](https://edwardgunning.github.io/) for the idea for t
 
 ---
 
+
 ### Functional regression approach 
 <div style="font-size: 80%;">
 
@@ -1854,6 +1877,184 @@ Number columns: $4 \cdot (4-1) / 2 = 6$
 
 ---
 
+
+### Functional regression: background
+
+
+We're familiar with predicting a (scalar) outcome using a (scalar) predictor
+
+```{r lreg}
+set.seed(1)
+n = 200
+x = rnorm(n)
+y = 1 + 2 * x + rnorm(n, sd = .8)
+sample_dat = tibble(x = x, y = y)
+
+sample_dat %>% 
+  ggplot(aes(x, y)) +
+  geom_point(alpha = .6) +
+  geom_smooth(method = "lm", se = FALSE, linewidth = 1, color = "#0072B2") +
+  labs(x = "Predictor (x)", y = "Outcome (y)")
+
+
+```
+
+
+---
+
+### Functional regression: background
+
+
+Sometimes our outcome is a curve over time (i.e., function) rather than a single value.
+
+We can model an outcome as a function of this curve: 
+
+$$Y_i = \alpha + \int X_i(t)\beta(t)dt + \epsilon_i$$
+
+```{r freg1}
+t = seq(0, 1, length.out = 100)
+beta = sin(2*pi*t) # coefficient function
+curve_data = tibble(t, beta)
+
+curve_data %>% 
+  ggplot(aes(t, beta)) + 
+  geom_line(linewidth = 1.1, color = "#009E73") +
+  labs(y = expression(beta(t)), x = "Time (t)",
+       title = expression(Coefficient ~ Function ~ beta(s)))
+
+
+```
+
+---
+
+### Functional regression: background
+
+```{r freg 2}
+set.seed(123)
+t = seq(0, 1, length.out = 200)
+
+# ---- generate base shapes using combinations of sine & cosine ----
+X1 =  0.8*sin(2*pi*t) + 0.4*cos(4*pi*t)
+X2 = -0.6*sin(3*pi*t + 0.3) + 0.9*cos(2*pi*t)
+X3 =  1.1*sin(5*pi*t - 0.4) - 0.3*cos(3*pi*t)
+
+dfX = tibble(
+  t = t,
+  subj1 = X1,
+  subj2 = X2,
+  subj3 = X3
+) %>%
+  pivot_longer(-t, names_to = "id", values_to = "X")
+
+# Put in a data frame + optionally smooth with GAM
+dfX = dfX %>%
+  group_by(id) %>%
+  group_modify(~ {
+    mod = gam(X ~ s(t, k = 20), data = .x)
+    .x$X = predict(mod, newdata = .x)
+    .x
+  })
+
+# ---- coefficient function ----
+beta = tibble(
+  t = t,
+  beta = 1.8*exp(-((t - 0.30)^2)/0.015) -
+    1.3*exp(-((t - 0.72)^2)/0.01)
+)
+
+# ---- product for Subject 1 ----
+dfProd = dfX %>%
+  filter(id == "subj1") %>%
+  left_join(beta, by = "t") %>%
+  mutate(prod = X * beta)
+
+# ---- plotting ----
+p1 = ggplot(dfX, aes(t, X, color = id)) +
+  geom_line(linewidth = 1.2, alpha = 0.9) +
+  labs(title = expression(Functional ~ Predictors ~ X[i](t)), y = "Value", x = "Time") +
+  scale_color_manual(values = c( "#56B4E9", "#E69F00", "#CC79A7"),
+                     name = "Subject", labels = c("1", "2", "3")) +
+  theme(legend.position = c(.8, .8),
+        legend.background = element_rect(fill = "white",color = "white")) +
+  guides(color = guide_legend(nrow = 1))
+
+p2 = ggplot(beta, aes(t, beta)) +
+  geom_line(linewidth = 1.3, alpha = 0.9, color = "#009E73") +
+  labs(title =expression(Coefficient ~ Function ~ beta(t)), y = "Value", x = "Time") +
+  geom_hline(aes(yintercept = 0), linetype = "dashed")+
+  annotate(geom = "label", x = 0.3, y = 0.5, label = "Positive values of β(t) indicate\nthat higher values of X(t) increase\nthe outcome", size = 4, color = "#444444", vjust = 1) +
+  annotate(geom = "segment", x= 0.3, xend = .3, y = 0.5, yend = 1.2,
+           arrow = arrow(length = unit(0.05, "inches"), type = "closed"),
+           color = "#444444")+
+  annotate(geom = "label", x = 0.7, y = 0.5, label = "Negative values of β(t) indicate\nthat higher values of X(t) decrease\nthe outcome", size = 4, color = "#444444", vjust = 1) +
+  annotate(geom = "segment", x= 0.7, xend = .7, y = 0, yend = -0.7,
+           arrow = arrow(length = unit(0.05, "inches"), type = "closed"),
+           color = "#444444")
+
+p3 = ggplot(dfProd, aes(t, prod)) +
+  geom_area(alpha = 0.35, fill = "#56B4E9") +
+  geom_line(linewidth = 1.2, color = "#56B4E9") +
+  labs(title = expression(Contribution ~ from ~ Subject ~ 1: ~  X[1]~(t)~x~ β~(t)),, y = "Value", x = "Time")
+
+(p1 / p2 / p3)
+
+# plot: pointwise contribution of the functional predictor X_i(t) to the outcome Y thru the functionalcoefficient beta(t) 
+
+# vertical slice: how much predictor is contributing to the LP 
+
+# integral over t: total contribution of X_i(t) to value of Y_i
+```
+
+---
+
+### Functional regression: background
+
++ Model on the previous took 1D function input $X(t)$
++ Can generalize to more dimensions
++ Instead of a curve, the functional coefficient becomes a multivariate surface 
+
+
+```{r freg surface}
+# Simulate a smoother grid
+t = seq(0, 1, length.out = 50)
+s = seq(0, 1, length.out = 50)
+grid = expand.grid(t = t, s = s)
+
+# Smoother functional predictors and coefficients
+grid$X = sin(pi * grid$t) * cos(pi * grid$s)
+grid$beta = cos(pi * grid$t) * sin(pi * grid$s)
+grid$contrib = grid$X * grid$beta
+
+# Convert to matrix for persp
+z = matrix(grid$contrib, nrow = length(t), ncol = length(s))
+
+# Create colors based on z
+zrange = range(z)
+colfunc = viridis(100, option = "B")
+col_idx = as.numeric(cut(z, breaks = 100))
+cols = colfunc[col_idx]
+
+# Classic 3D surface plot
+persp(
+  x = t,
+  y = s,
+  z = z,
+  theta = 30,    # rotation
+  phi = 30,      # elevation
+  expand = 0.5,
+  col = cols,
+  ltheta = 120,
+  shade = 0.5,
+  ticktype = "detailed",
+  xlab= "",
+  ylab ="",
+  zlab="",
+  main = "3D Functional Regression Surface"
+)
+
+```
+
+---
 
 ### Functional regression approach 
 <div style="font-size: 95%;">
@@ -1977,6 +2178,33 @@ model = mgcv::gam(
 
 ---
 
+### New dataset 
+
+
+:::: {.columns}
+
+::: {.column width="60%"}
+
+<div style="font-size: 150%;">
+
++ 153 individuals
++ 3 minutes of walking each
++ Two sessions at least one week apart 
+
+</div>
+:::
+
+::: {.column width="40%"}
+
+![ZJU-GaitAcc [@zju_dat]](figs/zju.png){fig-align="left"}
+
+:::
+
+::::
+
+
+---
+
 ### Functional regression results
 
 :::: {.columns}
@@ -1985,11 +2213,6 @@ model = mgcv::gam(
 
 Rank-1 (rank-5) % accuracies 
 
-153 person dataset
-
-3 min of walking seach
-
-Two sessions at least 1 week apart 
 
 + Train and test on session 1
   + Logistic regression: 92 (97) 
@@ -2016,11 +2239,6 @@ Two sessions at least 1 week apart
 
 Rank-1 (rank-5) % accuracies 
 
-153 person dataset
-
-3 min of walking seach
-
-Two sessions at least 1 week apart 
 
 + Train and test on session 1
   + Logistic regression: 92 (97) 
@@ -2055,8 +2273,8 @@ Two sessions at least 1 week apart
 <br>
 $\rightarrow$ Yes! 
 - <span style="color:gray;">Can we identify someone from their walking pattern measured by a wrist-worn accelerometer in big, free-living datasets?</span>
-- <span style="color:gray;">Can we accurately find walking and count steps in free-living datasets? </span>
-- <span style="color:gray;">Can we generalize conclusions from free-living accelerometry data to the US population?</span> 
+  - <span style="color:gray;">Can we accurately find walking and count steps in free-living datasets? </span>
+  - <span style="color:gray;">Can we generalize conclusions from free-living accelerometry data to the US population?</span> 
 - <span style="color:gray;">Can we apply these methods in other high-frequency data sources? </span>
 </div>
 
@@ -2069,8 +2287,8 @@ $\rightarrow$ Yes!
 <br>
 <span style="color:gray;">$\rightarrow$ Yes! </span>
 - Can we identify someone from their walking pattern measured by a wrist-worn accelerometer in big, free-living datasets?
-- <span style="color:gray;">Can we accurately find walking and count steps in free-living datasets? </span>
-- <span style="color:gray;">Can we generalize conclusions from free-living accelerometry data to the US population?</span> 
+  - <span style="color:gray;">Can we accurately find walking and count steps in free-living datasets? </span>
+  - <span style="color:gray;">Can we generalize conclusions from free-living accelerometry data to the US population?</span> 
 - <span style="color:gray;">Can we apply these methods in other high-frequency data sources? </span>
 
 </div>
@@ -2082,8 +2300,8 @@ $\rightarrow$ Yes!
 <br>
 <span style="color:gray;">$\rightarrow$ Yes! </span>
 - Can we identify someone from their walking pattern measured by a wrist-worn accelerometer in big, free-living datasets?
-- Can we accurately find walking and count steps in free-living datasets? 
-- <span style="color:gray;">Can we generalize conclusions from free-living accelerometry data to the US population?</span> 
+  - Can we accurately find walking and count steps in free-living datasets? 
+  - <span style="color:gray;">Can we generalize conclusions from free-living accelerometry data to the US population?</span> 
 - <span style="color:gray;">Can we apply these methods in other high-frequency data sources? </span>
 
 </div>
@@ -2327,10 +2545,10 @@ dose_resp %>%
 <br>
 <span style="color:gray;">$\rightarrow$ Yes! </span>
 - <span style="color:gray;">Can we identify someone from their walking pattern measured by a wrist-worn accelerometer in big, free-living datasets?</span>
-- Can we accurately find walking and count steps in free-living datasets? 
+  - Can we accurately find walking and count steps in free-living datasets? 
 <br>
-$\rightarrow$ Yes! 
-- <span style="color:gray;">Can we generalize conclusions from free-living accelerometry data to the US population?</span> 
+  $\rightarrow$ Yes! 
+  - <span style="color:gray;">Can we generalize conclusions from free-living accelerometry data to the US population?</span> 
 - <span style="color:gray;">Can we apply these methods in other high-frequency data sources? </span>
 
 </div>
@@ -2343,10 +2561,10 @@ $\rightarrow$ Yes!
 <br>
 <span style="color:gray;">$\rightarrow$ Yes! </span>
 - <span style="color:gray;">Can we identify someone from their walking pattern measured by a wrist-worn accelerometer in big, free-living datasets?</span>
-- <span style="color:gray;">Can we accurately find walking and count steps in free-living datasets?</span> 
+  - <span style="color:gray;">Can we accurately find walking and count steps in free-living datasets?</span> 
 <br>
-<span style="color:gray;">$\rightarrow$ Yes! </span>
-- Can we generalize conclusions from free-living accelerometry data to the US population?
+  <span style="color:gray;">$\rightarrow$ Yes! </span>
+  - Can we generalize conclusions from free-living accelerometry data to the US population?
 - <span style="color:gray;">Can we apply these methods in other high-frequency data sources? </span>
 </div>
 
@@ -2364,6 +2582,7 @@ Do males take more steps than females? At what points during the day?
 ```{r sex diffs}
 #| cache: true 
 steps_summ %>% 
+  mutate(age_cat = factor(age_cat,labels = c("<18","18-29","30-39","40-49","50-59","60-69","70+"))) %>% 
   ggplot(aes(x = ind, y = mean, color = gender)) + 
   facet_grid(.~age_cat) + 
   geom_smooth(se = FALSE) +
@@ -2390,12 +2609,12 @@ steps_summ %>%
 
 + Predictors: age, sex (scalars)
 
-+ Model: $$\mathbb{E}[\mathrm{steps}_i(s)] = \beta_0(s) + \beta_1(s)I\{\mathrm{sex}_i=\mathrm{female}\} + \beta_2(s)\mathrm{age}_i $$ 
++ Model: $$\mathbb{E}[\mathrm{steps}_i(s)] = \beta_0(s) + \beta_1(s)\mathbb{I}\{\mathrm{sex}_i=\mathrm{female}\} + \beta_2(s)(\mathrm{age}_i-50) $$ 
 $i$: participant; 
 $s \in \{1, \dots, 1440\}$: each minute of the day
 
 + **Interpretation**
-  + $\beta_0(s)$: expected steps for reference sex category and age 0
+  + $\beta_0(s)$: expected steps for reference sex category and age 50
   + $\beta_1(s)$: change in steps for females compared to males, holding age constant 
   + Can be interpreted at specific points of the day (e.g., how many more steps do males take at 12pm?) 
 
@@ -2646,12 +2865,12 @@ p1 +
 <br>
 <span style="color:gray;">$\rightarrow$ Yes! </span>
 - <span style="color:gray;">Can we identify someone from their walking pattern measured by a wrist-worn accelerometer in big, free-living datasets?</span>
-- <span style="color:gray;">Can we accurately find walking and count steps in free-living datasets? </span> 
+  - <span style="color:gray;">Can we accurately find walking and count steps in free-living datasets? </span> 
+  <br>
+  <span style="color:gray;">$\rightarrow$ Yes! </span>
+  - Can we generalize conclusions from free-living accelerometry data to the US population?
 <br>
-<span style="color:gray;">$\rightarrow$ Yes! </span>
-- Can we generalize conclusions from free-living accelerometry data to the US population?
-<br>
-$\rightarrow$ Yes! 
+  $\rightarrow$ Yes! 
 - <span style="color:gray;">Can we apply these methods in other high-frequency data sources? </span>
 </div>
 
@@ -2663,12 +2882,12 @@ $\rightarrow$ Yes!
 <br>
 <span style="color:gray;">$\rightarrow$ Yes! </span>
 - Can we identify someone from their walking pattern measured by a wrist-worn accelerometer in big, free-living datasets?
-- <span style="color:gray;">Can we accurately find walking and count steps in free-living datasets? </span> 
+  - <span style="color:gray;">Can we accurately find walking and count steps in free-living datasets? </span> 
 <br>
-<span style="color:gray;">$\rightarrow$ Yes! </span>
-- <span style="color:gray;">Can we generalize conclusions from free-living accelerometry data to the US population?</span>
+  <span style="color:gray;">$\rightarrow$ Yes! </span>
+  - <span style="color:gray;">Can we generalize conclusions from free-living accelerometry data to the US population?</span>
 <br>
-<span style="color:gray;">$\rightarrow$ Yes! </span>
+  <span style="color:gray;">$\rightarrow$ Yes! </span>
 - <span style="color:gray;">Can we apply these methods in other high-frequency data sources? </span>
 </div>
 
@@ -2775,12 +2994,12 @@ p4 = sample_dat2 %>%
 - Can we identify someone from their walking pattern measured by a wrist-worn accelerometer in big, free-living datasets?
 <br>
 $\rightarrow$ Yes!
-- <span style="color:gray;">Can we accurately find walking and count steps in free-living datasets? </span> 
+  - <span style="color:gray;">Can we accurately find walking and count steps in free-living datasets? </span> 
 <br>
-<span style="color:gray;">$\rightarrow$ Yes! </span>
-- <span style="color:gray;">Can we generalize conclusions from free-living accelerometry data to the US population?</span>
+  <span style="color:gray;">$\rightarrow$ Yes! </span>
+  - <span style="color:gray;">Can we generalize conclusions from free-living accelerometry data to the US population?</span>
 <br>
-<span style="color:gray;">$\rightarrow$ Yes! </span>
+  <span style="color:gray;">$\rightarrow$ Yes! </span>
 - <span style="color:gray;">Can we apply these methods in other high-frequency data sources? </span>
 </div>
 
@@ -2794,17 +3013,40 @@ $\rightarrow$ Yes!
 - <span style="color:gray;">Can we identify someone from their walking pattern measured by a wrist-worn accelerometer in big, free-living datasets?</span>
 <br>
 <span style="color:gray;">$\rightarrow$ Yes! </span>
-- <span style="color:gray;">Can we accurately find walking and count steps in free-living datasets? </span> 
+  - <span style="color:gray;">Can we accurately find walking and count steps in free-living datasets? </span> 
 <br>
-<span style="color:gray;">$\rightarrow$ Yes! </span>
-- <span style="color:gray;">Can we generalize conclusions from free-living accelerometry data to the US population?</span>
+    <span style="color:gray;">$\rightarrow$ Yes! </span>
+  - <span style="color:gray;">Can we generalize conclusions from free-living accelerometry data to the US population?</span>
 <br>
-<span style="color:gray;">$\rightarrow$ Yes! </span>
+  <span style="color:gray;">$\rightarrow$ Yes! </span>
 - Can we apply these methods in other high-frequency data sources?
 </div>
 
 
 # Can we apply these methods in other high-frequency data sources?
+
+---
+
+### Hemodynamics and cardiac surgery 
+
++ Collaboration with cardiac anesthesiologists
++ Model hemodynamic values during surgery to prevent acute kidney injury [@fine_mapping]
+
+:::: {.columns}
+
+::: {.column width="50%"}
+
+![](figs/cabg.jpeg){.equalheight}
+
+:::
+
+::: {.column width="50%"}
+
+![](figs/cpb.jpeg){.equalheight}
+
+:::
+
+::::
 
 ---
 
@@ -3070,12 +3312,12 @@ mean_preds %>%
 - <span style="color:gray;">Can we identify someone from their walking pattern measured by a wrist-worn accelerometer in big, free-living datasets?</span>
 <br>
 <span style="color:gray;">$\rightarrow$ Yes! </span>
-- <span style="color:gray;">Can we accurately find walking and count steps in free-living datasets? </span> 
+  - <span style="color:gray;">Can we accurately find walking and count steps in free-living datasets? </span> 
 <br>
-<span style="color:gray;">$\rightarrow$ Yes! </span>
-- <span style="color:gray;">Can we generalize conclusions from free-living accelerometry data to the US population?</span>
+  <span style="color:gray;">$\rightarrow$ Yes! </span>
+  - <span style="color:gray;">Can we generalize conclusions from free-living accelerometry data to the US population?</span>
 <br>
-<span style="color:gray;">$\rightarrow$ Yes! </span>
+  <span style="color:gray;">$\rightarrow$ Yes! </span>
 - Can we apply these methods in other high-frequency data sources?
 <br>
 $\rightarrow$ Yes!

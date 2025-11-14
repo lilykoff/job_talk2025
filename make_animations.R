@@ -138,7 +138,7 @@ anim_save(here::here("docs", "figs", "fingerprint.gif"), renderer = gifski_rende
 
 p_anim2 = dens_df %>%
   ggplot(aes(x = time, y = vm)) +
-  geom_line() +
+  geom_line(alpha=.5,linewdith=.5) +
   labs(x = "Time (s)", y = "Acceleration (g)") +
   scale_y_continuous(limits = c(0,3)) +
   scale_x_continuous(breaks=seq(0,120,30)) +
@@ -172,7 +172,7 @@ dens_df =
   # mutate(vm = sqrt(X^2 + Y^2 + Z^2)) %>%
   mutate(time = (row_number() / 100) - 0.01) %>%
   mutate(s = floor(time)) %>%
-  filter(s <= 120) %>%
+  filter(s <= 240) %>%
   group_by(s) %>%
   mutate(lag_vm = lag(vm, n = 15)) %>%
   ungroup()  %>%
@@ -185,7 +185,7 @@ plot_df =  dens_df %>%
 
 p = ggplot(plot_df, aes(x=vm, y=lag_vm, group = time, color = density)) +
   geom_point() +
-  scale_color_viridis(limits = c(0,2.15), name = "# points", option = "B") +
+  scale_color_viridis(name = "Density", option = "B") +
   labs(x = "Acceleration (g)", y = "Lag Acceleration (g)") +
   scale_x_continuous(limits = c(0,3)) +
   scale_y_continuous(limits = c(0,3)) +
@@ -210,10 +210,10 @@ anim_save(here::here("docs", "figs", "fingerprint2.gif"), renderer = gifski_rend
 
 p_anim2 = dens_df %>%
   ggplot(aes(x = time, y = vm)) +
-  geom_line() +
+  geom_line(alpha = .7, linewidth = .7) +
   labs(x = "Time (s)", y = "Acceleration (g)") +
   scale_y_continuous(limits = c(0,3)) +
-  scale_x_continuous(breaks=seq(0,120,30)) +
+  scale_x_continuous(breaks=seq(0,240,30)) +
   coord_cartesian(clip = "off") +
   theme(plot.margin = margin(40, 20, 40, 40),
         axis.title.x = element_text(vjust = 1.5),
