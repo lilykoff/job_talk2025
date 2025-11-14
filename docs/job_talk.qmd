@@ -672,8 +672,8 @@ plot_grid(p1, p2a, ncol = 2, align = "v", rel_widths = c(1,1))
 
 
 ### Details of the method
-::: {.incremental}
 
+::: {.incremental}
 **For each second and each person**: 
 <div style="font-size: 150%;">
 
@@ -685,10 +685,11 @@ plot_grid(p1, p2a, ncol = 2, align = "v", rel_widths = c(1,1))
 + I will walk through the process for one second, one person, and one lag  
 
 + Intuition: walking is cyclic process. We want to leverage cyclic nature of walking.
-  
-::: 
 
 </div>
+
+::: 
+
 
 --- 
 
@@ -1898,7 +1899,7 @@ $$\text{logit}(p_{ij}^{i_0}) =\beta_0^{i_0} + \int_{u=1}^S\int_{s=u}^SF_{i_0}\{ 
 
 $u = 1, \dots, S = 100$ (number of observations per second) 
 
-$v_{ij}(s)$ = acceleration at centisecond $s$ for subject $i$ in second $j$
+$v_{ij}(s)$ = $s^{th}$ for subject $i$ in second $j$
 
 $F(\cdot, \cdot, \cdot)$: trivariate smooth function, takes values at every point in the domain of acceleration, lag acceleration, lag length
 </div>
@@ -2053,7 +2054,7 @@ Two sessions at least 1 week apart
 - Can we identify someone from their walking pattern measured by a wrist-worn accelerometer? *(Digital fingerprinting)*
 <br>
 $\rightarrow$ Yes! 
-- <span style="color:gray;">Can we identify someone from their walking pattern measured by a wrist-worn accelerometer in big, free-living datasets when we don't know when people are walking?</span>
+- <span style="color:gray;">Can we identify someone from their walking pattern measured by a wrist-worn accelerometer in big, free-living datasets?</span>
 - <span style="color:gray;">Can we accurately find walking and count steps in free-living datasets? </span>
 - <span style="color:gray;">Can we generalize conclusions from free-living accelerometry data to the US population?</span> 
 - <span style="color:gray;">Can we apply these methods in other high-frequency data sources? </span>
