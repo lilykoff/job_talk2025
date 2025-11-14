@@ -2095,12 +2095,15 @@ $\rightarrow$ Yes!
 
 ### Validation: identifying walking in free-living datasets
 
-<div style="font-size: 150%;">
+
 + **Search** for free-living datasets with wrist-worn accelerometry and gold standard step counts
   + Free-living $\neq$ lab
 + **Implement** open-source algorithms for step counting from wrist accelerometry
 + **Evaluate** performance of algorithms 
-</div>
+
+![Capturing gold standard steps in one [dataset](https://cecas.clemson.edu/~ahoover/pedometer/)](figs/data-rec.png){fig-align="left"}
+
+
 
 ---
 
@@ -2430,6 +2433,7 @@ $s \in \{1, \dots, 1440\}$: each minute of the day
 + <span style="color:red;">BUT: NHANES is not a simple random sample</span>
 
 ![](figs/sample_design.gif)
+
 
 + Individuals sampled in geographic clusters, minority groups oversampled 
 
