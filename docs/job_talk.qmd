@@ -1910,7 +1910,7 @@ sample_dat %>%
 ### Functional regression: background
 
 
-Sometimes our outcome is a curve over time (i.e., function) rather than a single value.
+Sometimes our predictor is a curve over time (i.e., function) rather than a single value
 
 We can model an outcome as a function of this curve: 
 
@@ -1931,7 +1931,7 @@ $$Y_i = \alpha + \int X_i(t)\beta(t)dt + \epsilon_i$$
 
 ```{r freg1}
 t = seq(0, 1, length.out = 100)
-beta = sin(2*pi*t) # coefficient function
+beta = sin(1.75 * pi*t) # coefficient function
 curve_data = tibble(t, beta)
 
 curve_data %>% 
