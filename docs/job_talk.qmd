@@ -1931,6 +1931,7 @@ $$Y_i = \alpha + \int X_i(t)\beta(t)dt + \epsilon_i$$
 
 
 ```{r freg1}
+#| eval: false 
 t = seq(0, 1, length.out = 100)
 beta = sin(1.75 * pi*t) # coefficient function
 curve_data = tibble(t, beta)
@@ -1943,10 +1944,6 @@ curve_data %>%
 
 
 ```
-
----
-
-### Functional regression: background
 
 ```{r freg 2}
 #| cache: true 
@@ -1997,21 +1994,24 @@ p1 = ggplot(dfX, aes(t, X, color = id)) +
   scale_color_manual(values = c( "#56B4E9", "#E69F00", "#CC79A7"),
                      name = "Subject", labels = c("1", "2", "3")) +
   theme(legend.position = c(.7, .8),
-        legend.background = element_rect(fill = "white",color = "white")) +
+        legend.background = element_rect(fill = "white",color = "white"),
+        legend.text = element_text(size = 14),
+        legend.title = element_text(size = 15)) +
   guides(color = guide_legend(nrow = 1))
 
 p2 = ggplot(beta, aes(t, beta)) +
   geom_line(linewidth = 1.3, alpha = 0.9, color = "#009E73") +
   labs(title =expression(Coefficient ~ Function ~ hat(beta)(t)), y = "Value", x = "Time (t)") +
   geom_hline(aes(yintercept = 0), linetype = "dashed")+
-  annotate(geom = "label", x = 0.3, y = 0.5, label = "Positive values of coefficient\nindicate that higher values of X(t)\nincrease the outcome", size = 4, color = "#444444", vjust = 1) +
-  annotate(geom = "segment", x= 0.3, xend = .3, y = 0.5, yend = 1.2,
+  annotate(geom = "label", x = 0.25, y = 0.5, label = "Change in outcome associated with\none unit increase in X(0.25), holding\nall other values of X(t) constant", size = 5, color = "#444444", vjust = 1) +
+  annotate(geom = "segment", x= 0.25, xend = .25, y = 0.5, yend = 1.45,
            arrow = arrow(length = unit(0.05, "inches"), type = "closed"),
-           color = "#444444")+
-  annotate(geom = "label", x = 0.7, y = 0.5, label = "Negative values of coefficient\nindicate that higher values of X(t)\ndecrease the outcome", size = 4, color = "#444444", vjust = 1) +
-  annotate(geom = "segment", x= 0.7, xend = .7, y = -.1, yend = -0.7,
-           arrow = arrow(length = unit(0.05, "inches"), type = "closed"),
-           color = "#444444")
+           color = "#444444") +
+  annotate(geom = "point", color = "black", size = 2, x = 0.251, y = 1.54)
+  # annotate(geom = "label", x = 0.7, y = 0.5, label = "Negative values of coefficient\nindicate that higher values of X(t)\ndecrease the outcome", size = 4, color = "#444444", vjust = 1) +
+  # annotate(geom = "segment", x= 0.7, xend = .7, y = -.1, yend = -0.7,
+  #          arrow = arrow(length = unit(0.05, "inches"), type = "closed"),
+  #          color = "#444444")
 
 p3 = ggplot(dfProd, aes(t, prod)) +
   geom_area(alpha = 0.35, fill = "#56B4E9") +
@@ -2031,7 +2031,14 @@ p1
 
 ### Functional regression: background
 
-```{r}
+
+Sometimes our outcome is a curve over time (i.e., function) rather than a single value.
+
+We can model an outcome as a function of this curve: 
+
+$$Y_i = \alpha + \int X_i(t)\beta(t)dt + \epsilon_i$$
+
+```{r freg2}
 p2
 ```
 
@@ -2039,7 +2046,14 @@ p2
 
 ### Functional regression: background
 
-```{r}
+
+Sometimes our outcome is a curve over time (i.e., function) rather than a single value.
+
+We can model an outcome as a function of this curve: 
+
+$$Y_i = \alpha + \int X_i(t)\beta(t)dt + \epsilon_i$$
+
+```{r freg3}
 p3 
 ```
 
