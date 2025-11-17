@@ -1883,7 +1883,9 @@ Number columns: $4 \cdot (4-1) / 2 = 6$
 
 We're familiar with predicting a (scalar) outcome using a (scalar) predictor
 
-$$Y_i = \alpha + \beta X_i$$ 
+$$Y_i = \alpha + \beta X_i + \epsilon_i$$
+
+
 ```{r lreg}
 set.seed(1)
 n = 200
@@ -1895,11 +1897,10 @@ sample_dat %>%
   ggplot(aes(x, y)) +
   geom_point(alpha = .6) +
   geom_smooth(method = "lm", se = FALSE, linewidth = 1, color = "#0072B2") +
-  labs(x = "Predictor (x)", y = "Outcome (y)") +
+  labs(x = "Predictor (X)", y = "Outcome (Y)") +
   annotate(geom = "label", 
            label = "hat(beta) == 1.9", parse = TRUE,
-           x = 2, y = 0, color = "#0072B2", size = 5)
-           
+           x = 2, y = 0, color = "#0072B2", size = 5) 
 
 
 ```
@@ -1992,7 +1993,7 @@ dfProd = dfX %>%
 # ---- plotting ----
 p1 = ggplot(dfX, aes(t, X, color = id)) +
   geom_line(linewidth = 1.2, alpha = 0.9) +
-  labs(title = expression(Functional ~ Predictors ~ X[i](t)), y = "Value", x = "Time") +
+  labs(title = expression(Functional ~ Predictors ~ X[i](t)), y = "Value", x = "Time (t)") +
   scale_color_manual(values = c( "#56B4E9", "#E69F00", "#CC79A7"),
                      name = "Subject", labels = c("1", "2", "3")) +
   theme(legend.position = c(.7, .8),
@@ -2001,7 +2002,7 @@ p1 = ggplot(dfX, aes(t, X, color = id)) +
 
 p2 = ggplot(beta, aes(t, beta)) +
   geom_line(linewidth = 1.3, alpha = 0.9, color = "#009E73") +
-  labs(title =expression(Coefficient ~ Function ~ hat(beta)(t)), y = "Value", x = "Time") +
+  labs(title =expression(Coefficient ~ Function ~ hat(beta)(t)), y = "Value", x = "Time (t)") +
   geom_hline(aes(yintercept = 0), linetype = "dashed")+
   annotate(geom = "label", x = 0.3, y = 0.5, label = "Positive values of coefficient\nindicate that higher values of X(t)\nincrease the outcome", size = 4, color = "#444444", vjust = 1) +
   annotate(geom = "segment", x= 0.3, xend = .3, y = 0.5, yend = 1.2,
@@ -2015,7 +2016,7 @@ p2 = ggplot(beta, aes(t, beta)) +
 p3 = ggplot(dfProd, aes(t, prod)) +
   geom_area(alpha = 0.35, fill = "#56B4E9") +
   geom_line(linewidth = 1.2, color = "#56B4E9") +
-  labs(title = expression(Contribution ~ from ~ Subject ~ 1: ~  X[1]~(t)~x~ hat(β)~(t)),, y = "Value", x = "Time")
+  labs(title = expression(Contribution ~ from ~ Subject ~ 1: ~  X[1]~(t)~x~ hat(β)~(t)),, y = "Value", x = "Time (t)")
 
 p1
 
@@ -2137,7 +2138,7 @@ $$\text{logit}(p_{ij}^{i_0}) =\beta_0^{i_0} + \int_{u=1}^S\int_{s=u}^SF_{i_0}\{ 
 
 $u = 1, \dots, S = 100$ (number of observations per second) 
 
-$v_{ij}(s)$ = $s^{th}$ for subject $i$ in second $j$
+$v_{ij}(s)$ = $s^{th}$ acceleration observation for subject $i$ in second $j$
 
 $F(\cdot, \cdot, \cdot)$: trivariate smooth function, takes values at every point in the domain of acceleration, lag acceleration, lag length
 </div>
@@ -2158,7 +2159,7 @@ $$\text{logit}(p_{ij}^{i_0}) =\beta_0^{i_0} + \int_{u=1}^S\int_{s=u}^SF_{i_0}\{ 
 
 $u = 1, \dots, S = 100$ (number of observations per second) 
 
-$v_{ij}(s)$ = acceleration at centisecond $s$ for subject $i$ in second $j$
+$v_{ij}(s)$ = $s^{th}$ acceleration observation for subject $i$ in second $j$
 
 $F(\cdot, \cdot, \cdot)$: trivariate smooth function, takes values at every point in the domain of acceleration, lag acceleration, lag length
 
@@ -3066,14 +3067,16 @@ $\rightarrow$ Yes!
 
 ### Hemodynamics and cardiac surgery 
 
-+ Pipeline to analyze minute-level multivariate hemodynamics data collected during cardiac surgery [@blood]
-+ Methods to model relationship between hemodynamics and acute kidney injury [@fine_mapping]
++ Coronary artery bypass surgery (CABG): most common heart surgery globally
++ Acute kidney injury (AKI): common complication leading to increased morbidity and mortality 
++ Pipeline to process, visualize, and analyze minute-level multivariate hemodynamics data collected during cardiac surgery [@blood]
++ Methods to model relationship between hemodynamics during surgery and AKI [@fine_mapping]
 
 :::: {.columns}
 
 ::: {.column width="50%"}
 
-![](figs/cabg.jpeg){.equalheight}
+![](figs/cabg.jpeg){width="45%"}
 
 :::
 
