@@ -1923,7 +1923,7 @@ $$Y_i = \alpha + \int X_i(t)\beta(t)dt + \epsilon_i$$
 ### Functional regression: background
 
 
-Sometimes our outcome is a curve over time (i.e., function) rather than a single value.
+Sometimes our predictor is a curve over time (i.e., function) rather than a single value
 
 We can model an outcome as a function of this curve: 
 
@@ -2032,7 +2032,7 @@ p1
 ### Functional regression: background
 
 
-Sometimes our outcome is a curve over time (i.e., function) rather than a single value.
+Sometimes our predictor is a curve over time (i.e., function) rather than a single value
 
 We can model an outcome as a function of this curve: 
 
@@ -2047,7 +2047,7 @@ p2
 ### Functional regression: background
 
 
-Sometimes our outcome is a curve over time (i.e., function) rather than a single value.
+Sometimes our predictor is a curve over time (i.e., function) rather than a single value
 
 We can model an outcome as a function of this curve: 
 
