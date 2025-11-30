@@ -2358,7 +2358,7 @@ $\rightarrow$ Yes!
 
 # Can we accurately find walking and count steps in free-living datasets?
 
----
+
 
 # Can we accurately find walking and count steps in free-living datasets?
 
