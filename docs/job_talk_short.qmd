@@ -347,6 +347,13 @@ p3 =
 plot_grid(img_plot, NULL, align = "v", rel_widths = c(1,1), ncol = 2)
 ```
 
+::: {.notes}
+I love data. especially big data, collected at high frequency, from wearable devices.
+these data/devices are everywhere: apple watch, oura ring, CGM, heart rate monitor
+have potential to provide rich, detailed information about health and movement in the real world - but processing and analysis pose computational and methodological challenges 
+my work: methods for proc and analyzing these data to extract meaningful scientific insights. my goal is to create new approaches that advance public health research and  statistical science. I am also passionate about creating interpretable visualizations and open source tools/software/data.
+:::
+
 ## Introduction: accelerometry data 
 
 ```{r accel plot w fig}
@@ -354,6 +361,15 @@ p1a = p1 / p2 / p3 + plot_layout(guides = "collect", axes = "collect")
 
 plot_grid(img_plot, p1a, align = "v", rel_widths = c(1,1), ncol = 2)
 ```
+
+::: {.notes}
+In this talk, I'll focus primarily on data from wrist worn accelerometers. 
+Accel has a tiny sensor that collects data on acceleration in 3 dimensions at something b/w 10-100 observations per second. 
+Accel data, at it's core, provides information about human movement - how much, and potentially what type
+Common in consumer devices - for example, accel data used to generate step counts in your iphone or fitbit 
+Research accelerometers are also used in epidemiological studies like NHANES, UK Biobank 
+:::
+
 
 ## Introduction: **big** accelerometry data 
 
@@ -391,6 +407,17 @@ final_plot = nh_img_plot +
 
 final_plot
 ```
+
+::: {.notes}
+NHANES: ntlly representative study of 5000 Americans per year
+Info on demographics, SES, disease/health history, physical measurements/lab tests, nutrition, and mortality
+With accel: also movement 
+Goal - can understand relationship between health and movement 
+Easier said than done 
+My PhD: asking questions of accelerometry data w/ goal of creating methods to understand relationship between movement and health 
+
+:::
+
 
 ## Outline {.question-bullets}
 <div style="font-size: 115%;">
@@ -540,6 +567,14 @@ plot_grid(p1, p_empty, ncol = 2, align = "v", rel_widths = c(1,1))
 
 ```
 
+::: {.notes}
+Why do we care about this? interesting, biometric, might say something about health status, change in it could predict change in health. 
+
+
+Let's make this more concrete....
+
+::: 
+
 ---
 
 ### Problem setup 
@@ -551,6 +586,10 @@ plot_grid(p1, p_empty, ncol = 2, align = "v", rel_widths = c(1,1))
 plot_grid(p1, p2, ncol = 2, align = "v", rel_widths = c(1,1))
 
 ```
+
+::: {.notes}
+Engage audience 
+:::
 
 ---
 
@@ -668,6 +707,7 @@ plot_grid(p1, p2a, ncol = 2, align = "v", rel_widths = c(1,1))
 
 ```
 
+
 ---
 
 
@@ -690,6 +730,13 @@ plot_grid(p1, p2a, ncol = 2, align = "v", rel_widths = c(1,1))
 </div>
 
 ::: 
+
+::: {.notes}
+This has been done before, mostly with video data
+Existing accelerometry approaches require segmentation of step -error prone, computationally intensive
+Tried Fourier transform, summaries of time series (mean, SD, higher order moments), didn't work 
+This approach: take time series, make more complex, use summaries of complex thing 
+:::
 
 
 --- 
@@ -982,6 +1029,7 @@ plot_grid(p, p1, ncol = 1, align = "h", rel_heights = c(1,1))
 
 ```
 
+
 ---
 
 ### Obtain joint distribution of acceleration and lag acceleration 
@@ -1087,6 +1135,14 @@ df %>%
   geom_rect(data = plot_df2, aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), color = "darkgrey", fill = "transparent") 
 
 ```
+
+::: {.notes}
+Derive predictors from joint distribution by binning space into cells, and summing observations in cell - essentially a fancy histogram, where the bins of our histogram are these cells
+Vectorize, put into predictor matrix 
+3 lags x 144 cells = 432 columns in matrix
+
+:::
+
 
 ---
 
@@ -1514,6 +1570,14 @@ pv2l = pv2l + labs(title = "Second 1")
 (pv2l + pv2 + plot_layout(axes = "collect")) / arrow_plot  / p2 + plot_layout(ncol = 1, heights = c(1, 0.2, 1))
 ```
 
+::: {.notes}
+Before we keep going, we want to see if these summaries will have predictive power? 
+Plot the joint distribution over all seconds for each person
+lighter = higher density
+if each row looks different, then we're onto something: preds dervied from these images should tell us something about identity 
+:::
+
+
 ----
 
 ### Fingerprints summarize predictors for a given lag and are different across individuals
@@ -1776,6 +1840,12 @@ pred_df %>%
 
 <div style=" position: absolute; bottom: 1em; right: -4em; font-size: 0.7em; color: #777; "> @Koffman2023 </div>
 
+::: {.notes}
+
+Each column has n points, one point per model, point corresponding to the model trained for correct subject is green. if above all pink points, person is correctly identified, and larger separation means bigger discrimination between correct subject and second-most likely subject
+:::
+
+
 ---
 
 ### Why not use all possible lags? 
@@ -1814,6 +1884,11 @@ Hat tip to [Edward Gunning](https://edwardgunning.github.io/) for the idea for t
 ::: footer
 Hat tip to [Edward Gunning](https://edwardgunning.github.io/) for the idea for these figures
 :::
+
+::: {.notes}
+Three matrices represent every combination of acceleration, lag acceleration, and lag observed in each second (each row is a second)
+::: 
+
 ---
 
 ### Why not use all possible lags? 
@@ -1874,6 +1949,10 @@ $$
 
 Number columns: $4 \cdot (4-1) / 2 = 6$ 
 </div>
+
+::: {.notes}
+First talk about how we construct the matrix, then talk about functional regression
+:::
 
 ---
 
@@ -2118,6 +2197,15 @@ $$Y_{ij}^{i_0}\sim\text{Bernoulli}(p_{ij}^{i_0})$$
 where $Y_{ij}^{i_0} = 1$ if subject $i$ in second $j$ belongs to subject $i_0$, and 0 otherwise
 
 </div>
+
+::: {.notes}
+For each subject we model probability that the data belongs to that person
+Model that binary outcome with a trivariate functional regression
+Let the data define smooth surface F that relates acceleration, lag acceleration, and lag length to probability of identity
+Captures dynamic changes in signal: how fast it increases, decreases 
+Fit w/ penalized splines to allow F to be flexible but smooth across the 3 domains 
+:::
+
 ---
 
 ### Functional regression approach 
@@ -2227,6 +2315,10 @@ model = mgcv::gam(
 :::
 
 </div>
+
+::: {.notes}
+Grid cell approach: piecewise const version of F, where effect is constant within each cell region. Freg: smooths over that grid, using penalized splines instead of the fixed bins 
+::: 
 
 ---
 
@@ -2364,6 +2456,11 @@ $\rightarrow$ Yes!
 
 Yes! See Appendix 
 
+::: {.notes}
+Wrote a validation paper where I tracked down data sets with gold standard step counts and free living accelerometry data, compared performance of open source algorithms, and found "best" algorithm. Then applied these algorithms in NHANES. 
+
+:::
+
 ---
 
 
@@ -2442,6 +2539,11 @@ xdf %>%
 
 ```
 
+::: {.notes}
+Quick summary of those results 
+Steps decrease with age (as expected)
+::: 
+
 ---
 
 
@@ -2509,7 +2611,9 @@ dose_resp %>%
 
 </div>
 
-
+::: {.notes}
+Before I could get back to step counting, had a few more questions 
+:::
 
 # Can we generalize conclusions from free-living accelerometry data to the US population?
 
@@ -2538,6 +2642,10 @@ steps_summ %>%
 
 
 ```
+
+::: {.notes}
+We want to quantify this relationship - fit a model. Tool we have for that is FoSR. Where before we had function as predictor, it can also be an outcome. 
+:::
 
 ---
 
