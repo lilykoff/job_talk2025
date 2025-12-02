@@ -13,6 +13,7 @@ format:
     slide-number: true
     toc: false
     progress: true
+    footer: tinyurl.com/kofftalk45
     hash: true
     overview: true
     code-overflow: wrap
