@@ -2746,7 +2746,7 @@ We want to quantify this relationship - fit a model. Tool we have for that is Fo
 
 ### Function on scalar regression 
 
-<div style="font-size: 115%;">
+<div style="font-size: 105%;">
 
 ::: {.incremental}
 + Outcome: steps profile over the course of the day (function) 
@@ -2823,7 +2823,8 @@ p1 = df2 %>%
   ) +
   scale_x_continuous(breaks= c(60, seq(240, 1440, 4 * 60)), labels = c("01:00", "04:00", "08:00", "12:00", "16:00", "20:00", "24:00")) +
   labs(x = "Hour of Day", y = "Steps per minute") +
-  scale_color_manual(values = c("#E69F00", "#009E73FF"), name = "Model") +
+  scale_color_manual(values = c("#E69F00", "#009E73FF"), name = "Model",
+                     labels = c("Unadjusted", "Survey-aware")) +
   theme(legend.position = "bottom")
 p1
 ```
@@ -2839,9 +2840,9 @@ p1 +
   geom_ribbon(aes(x = s, ymin = lower, ymax = upper, fill = model), alpha = .5) +
   geom_line(aes(color = model), linewidth = 1.2)  +
   scale_fill_manual(values = c("#E69F00", "#009E73FF"), name = "Model",
-                    labels = c("Unweighted", "BRR")) +
+                    labels = c("Unadjusted", "Survey-aware")) +
   scale_color_manual(values = c("#E69F00", "#009E73FF"), name = "Model",
-                    labels = c("Unweighted", "BRR")) 
+                    labels = c("Unadjusted", "Survey-aware")) 
   
 ```
 
@@ -2975,6 +2976,7 @@ p4 = sample_dat2 %>%
 
 ---
 
+
 ## Outline {.question-bullets}
 <div style="font-size: 115%;">
 - <span style="color:gray;">Can we identify someone from their walking pattern measured by a wrist-worn accelerometer? *(Digital fingerprinting)* </span>
@@ -3002,9 +3004,10 @@ $\rightarrow$ Yes!
 
 ::: {.column width="60%"}
 
-+ Coronary artery bypass surgery (CABG): most common heart surgery globally
-+ Pipeline to process, visualize, and analyze minute-level multivariate hemodynamics data collected during cardiac surgery [@blood]
-+ Methods to model relationship between hemodynamics during surgery and outcomes including acute kidney injury (AKI) and length of stay [@fine_mapping]
++ Hemodynamics: how blood flows through your body
++ Modifiable risk factor for adverse outcomes after surgery
+  + Mean arterial pressure (MAP): average pressure pushing blood through vessels, important for organ perfusion
+  + Central venous pressure (CVP): pressure of blood returning to heart 
 
 :::
 
@@ -3021,25 +3024,26 @@ $\rightarrow$ Yes!
 #### Pipeline for processing, analysis, and visualization
 
 ```{r hemo vis}
-hts %>% 
-  filter(id == id[1]) %>% 
-  mutate(rel_time = as.numeric(difftime(time, min(time), units = "hours")),
-         cat_cpb = factor(cat_cpb, levels = c("pre", "intra", "post"),
+hemo_ts_plotdf %>% 
+  mutate(cat_cpb = factor(cat_cpb, levels = c("pre", "intra", "post"),
                           labels= c("Pre", "Intra", "Post"))) %>% 
-  pivot_longer(cols = c(val_MAP, val_CVP)) %>% 
-  mutate(name = factor(name, labels = c("Central Venous Pressure", "Mean Arterial Pressure"))) %>% 
-  ggplot(aes(x = rel_time, y = value, color = cat_cpb)) + 
+  ggplot(aes(x = time_elaps, y = value, color = cat_cpb)) + 
   geom_step() + 
-  facet_wrap(name ~ ., scales = "free_y", nrow = 2) + 
+  facet_wrap(param ~ ., scales = "free_y", nrow = 2) + 
   labs(x = "Time since start of surgery (hours)", y = "Value (mmHg)") + 
   scale_color_manual(values = c("#E69F00", "#56B4E9", "#009E73"), name = "Cardiopulmonary Bypass (CPB) Status") +
-  theme(legend.position = "bottom")
+  theme(legend.position = "bottom",
+        legend.text = element_text(size = 12),
+        legend.title = element_text(size = 14)) + 
+  scale_x_continuous(breaks=seq(0, 7, 1)) 
 
 ```
 
+<div style=" position: absolute; bottom: 0.5em; right: -4em; font-size: 0.7em; color: #777; "> @blood </div>
+
 --- 
 
-#### Hemodynamic states and acute kidney injury
+#### Hemodynamic states and acute kidney injury (AKI)
 
 ```{r recommended}
 hemo_ts_plotdf %>% 
@@ -3048,10 +3052,14 @@ hemo_ts_plotdf %>%
   geom_point(size = 0.8, aes(color = factor(danger))) + 
   # geom_line() + 
   labs(x = "Time since start of surgery (hours)", y = "Value (mmHg)") +
-  theme(legend.position = "bottom") + 
+  theme(legend.position = "bottom",
+        legend.text = element_text(size = 12),
+        legend.title = element_text(size = 14)) + 
   scale_color_manual(values = c("#000000", "#56B4E9"),
                      name = "Within recommended range (from literature)",
-                     labels = c("Yes", "No"))
+                     labels = c("Yes", "No")) +
+    scale_x_continuous(breaks=seq(0, 7, 1)) 
+
 
 ```
 
@@ -3099,6 +3107,7 @@ plotdf %>%
 
 ```
 
+<div style=" position: absolute; bottom: 0.5em; right: -4em; font-size: 0.7em; color: #777; "> @fine_mapping </div>
 ---
 
 #### Hemodynamic states and acute kidney injury
@@ -3116,7 +3125,9 @@ hemo_ts_plotdf  %>%
         legend.title = element_text(size = 14)) + 
   scale_color_manual(values = c("#000000", "#56B4E9"),
                      name = "Within recommended range (from our work)",
-                     labels = c("Yes", "No"))
+                     labels = c("Yes", "No")) +
+    scale_x_continuous(breaks=seq(0, 7, 1)) 
+
 
 ```
 
@@ -3138,7 +3149,9 @@ hemo_ts_plotdf %>%
         legend.text = element_text(size = 12),
         legend.title = element_text(size = 14)) + 
   scale_color_manual(values = c("darkgrey", "#D55E00"),
-                     name = "Change with our analysis")
+                     name = "Change with our analysis") +
+    scale_x_continuous(breaks=seq(0, 7, 1)) 
+
 ```
 
 
@@ -3147,7 +3160,7 @@ hemo_ts_plotdf %>%
 #### Hemodynamics states and length of stay 
 
 ```{r los}
-quartiles = quantile(df_surv$group_5, seq(0, 1, .25)); quartiles
+# quartiles = quantile(df_surv$group_5, seq(0, 1, .25)); quartiles
 df_surv = 
   df_surv %>% 
   mutate(los = los / 24, 
@@ -3160,15 +3173,15 @@ ggsurvplot(
    xlab = "Time (days)",
    ylab = "Hospital discharge probability",
    xlim = c(0, 40),
-   palette = c("#0072B2", "#D55E00"),
+   palette = c("#009E73", "#CC79A7"),
    break.time.by = 10,
    data = df_surv,  # data used to fit survival curves. 
    pval = TRUE,             # show p-value of log-rank test.
    conf.int = TRUE,  
    pval.coord = c(20, 0.5),
    legend = "bottom",
-   legend.title = "Low MAP Low CVP Exposure Time",
-   legend.labs = c("At least 5 minutes", "Less than 5 minutes"),
+   legend.title = "Zone 5 Exposure Time",
+   legend.labs = c("Less than 5 minutes", "At least 5 minutes"),
    ggtheme = theme_minimal()
 ) 
 ```
