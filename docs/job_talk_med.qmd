@@ -2238,7 +2238,7 @@ p3 = ggplot(dfProd, aes(t, prod)) +
 
 p3_bar = ggplot(dfProd, aes(t, prod)) + 
   geom_col(width = diff(range(t)) / length(t), fill = "#56B4E9", alpha = 0.8, color = "#444444") +
-  labs(title = expression(Pointwise ~ contributions: ~ X[1](t) ~ x ~ hat(beta)(t) ~ x ~ Delta(t)),
+  labs(title = expression(Pointwise ~ contributions: ~ X[1](t) ~ x ~ hat(beta)(t) ~ x ~ Delta ~t),
        y = "Value", x = "Time (t)")
 
 
@@ -2278,16 +2278,6 @@ $$
 
 (**Riemann sum** approximation; in the limit, this becomes an integral)
 
-
----
-
-### Functional regression: background
-
-Instead of estimating a separate coefficient at each time point:
-
-$$
-Y_i = \alpha + \sum_{k=1}^T \beta_k X_i(t_k) +\epsilon_i
-$$
 
 ---
 
