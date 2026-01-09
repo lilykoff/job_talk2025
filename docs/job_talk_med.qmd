@@ -298,6 +298,58 @@ dens_df_s6_l30 =
 
 dens_df_s6_l30$density = get_density(dens_df_s6_l30$vm, dens_df_s6_l30$lag_vm, n = 100)
 
+### more densities 
+dd1 =
+  iu_dat %>%
+  filter(ID2 == 2) %>% 
+  mutate(time = (row_number() / 100) - 0.01) %>%
+  mutate(s = floor(time)) %>%
+  filter(s <= 240) %>%
+  group_by(s) %>%
+  mutate(lag_vm = lag(vm, n = 1)) %>%
+  ungroup()  %>%
+  drop_na()
+
+dd1$density = get_density(dd1$vm, dd1$lag_vm, n = 100)
+
+dd2 =
+  iu_dat %>%
+  filter(ID2 == 2) %>% 
+  mutate(time = (row_number() / 100) - 0.01) %>%
+  mutate(s = floor(time)) %>%
+  filter(s <= 240) %>%
+  group_by(s) %>%
+  mutate(lag_vm = lag(vm, n = 2)) %>%
+  ungroup()  %>%
+  drop_na()
+
+dd2$density = get_density(dd2$vm, dd2$lag_vm, n = 100)
+
+dd50 =
+  iu_dat %>%
+  filter(ID2 == 2) %>% 
+  mutate(time = (row_number() / 100) - 0.01) %>%
+  mutate(s = floor(time)) %>%
+  filter(s <= 240) %>%
+  group_by(s) %>%
+  mutate(lag_vm = lag(vm, n = 50)) %>%
+  ungroup()  %>%
+  drop_na()
+
+dd50$density = get_density(dd50$vm, dd50$lag_vm, n = 100)
+
+dd99 =
+  iu_dat %>%
+  filter(ID2 == 2) %>% 
+  mutate(time = (row_number() / 100) - 0.01) %>%
+  mutate(s = floor(time)) %>%
+  filter(s <= 240) %>%
+  group_by(s) %>%
+  mutate(lag_vm = lag(vm, n = 99)) %>%
+  ungroup()  %>%
+  drop_na()
+
+dd99$density = get_density(dd99$vm, dd99$lag_vm, n = 100)
 
 hts = read_rds(here::here("docs", "data", "hemo_timeseries_interp_post_exclusion.rds")) %>% 
   as_tibble() 
@@ -383,8 +435,18 @@ hemo_ts_plotdf =
   mutate(change = danger != danger2 & !is.na(danger2),
          change = replace_na(change, 0)) 
 
+hts1 = 
+  hts %>% 
+  filter(id == "10148_785999") %>% 
+  mutate(val_CVP = if_else(cat_cpb == "intra", NA_real_, val_CVP)) %>% 
+  mutate(time_elaps = as.numeric(difftime(time, min(time),
+                               units = "hours"))) 
+
+
 df_surv = read_rds(here::here("docs", "data", "temp_los_df.rds"))
 
+aki_id = "14484_377496"
+noaki_id = "75457_952257"
 ```
 
 
@@ -516,8 +578,7 @@ My PhD: asking questions of accelerometry data w/ goal of creating methods to un
 
 - Can we identify someone from their walking pattern measured by a wrist-worn accelerometer? *(Digital fingerprinting)*
 - Can we identify someone from their walking pattern measured by a wrist-worn accelerometer in big, free-living datasets? 
-  - Can we accurately find walking and count steps in free-living datasets?
-  - Can we generalize conclusions from free-living accelerometry data to the US population? 
+- What else can we learn from walking patterns in free-living data? 
 - Can we apply these methods to other high-density data sources? 
 
 :::
@@ -531,12 +592,12 @@ My PhD: asking questions of accelerometry data w/ goal of creating methods to un
 <div style="font-size: 115%;">
 - Can we identify someone from their walking pattern measured by a wrist-worn accelerometer? *(Digital fingerprinting)*
 - <span style="color:gray;">Can we identify someone from their walking pattern measured by a wrist-worn accelerometer in big, free-living datasets?</span>
-  - <span style="color:gray;">Can we accurately find walking and count steps in free-living datasets? </span>
-  - <span style="color:gray;">Can we generalize conclusions from free-living accelerometry data to the US population?</span> 
+- <span style="color:gray;"> What else can we learn from walking patterns in free-living data? </span>
 - <span style="color:gray;">Can we apply these methods to other high-density data sources? </span>
 
 
 </div>
+
 # Can we identify someone from their walking pattern measured by a wrist-worn accelerometer?
 
 ---
@@ -2058,6 +2119,7 @@ $$Y_i = \alpha + \beta X_i + \epsilon_i$$
 
 
 ```{r lreg}
+#| cache: true 
 set.seed(1)
 n = 200
 x = rnorm(n)
@@ -2082,40 +2144,22 @@ sample_dat %>%
 ### Functional regression: background
 
 
-Sometimes our predictor is a curve over time (i.e., function) rather than a single value
+Sometimes our predictor is a series of values over time rather than a single value 
 
-We can model an outcome as a function of this curve: 
+We can think of this as having many correlated predictors: 
 
-$$Y_i = \alpha + \int X_i(t)\beta(t)dt + \epsilon_i$$
+$$Y_i = \alpha + \beta_1X_i(t_1) + \beta_2X_i(t_2) + \dots + \beta_TX_i(t_T) + \epsilon_i$$
 
 ---
-
 
 ### Functional regression: background
 
 
-Sometimes our predictor is a curve over time (i.e., function) rather than a single value
+Sometimes our predictor is a series of values over time rather than a single value 
 
-We can model an outcome as a function of this curve: 
+We can think of this as having many correlated predictors: 
 
-$$Y_i = \alpha + \int X_i(t)\beta(t)dt + \epsilon_i$$
-
-
-```{r freg1}
-#| eval: false 
-t = seq(0, 1, length.out = 100)
-beta = sin(1.75 * pi*t) # coefficient function
-curve_data = tibble(t, beta)
-
-curve_data %>% 
-  ggplot(aes(t, beta)) + 
-  geom_line(linewidth = 1.1, color = "#009E73") +
-  labs(y = expression(hat(beta)(t)), x = "Time (t)",
-       title = expression(Coefficient ~ Function ~ hat(beta)(t)))
-
-
-```
-
+$$Y_i = \alpha + \beta_1X_i(t_1) + \beta_2X_i(t_2) + \dots + \beta_TX_i(t_T) + \epsilon_i$$
 ```{r freg 2}
 #| cache: true 
 
@@ -2160,7 +2204,8 @@ dfProd = dfX %>%
 
 # ---- plotting ----
 p1 = ggplot(dfX, aes(t, X, color = id)) +
-  geom_line(linewidth = 1.2, alpha = 0.9) +
+  geom_point() +
+  # geom_line(linewidth = 1.2, alpha = 0.9) +
   labs(title = expression(Functional ~ Predictors ~ X[i](t)), y = "Value", x = "Time (t)") +
   scale_color_manual(values = c( "#56B4E9", "#E69F00", "#CC79A7"),
                      name = "Subject", labels = c("1", "2", "3")) +
@@ -2174,7 +2219,7 @@ p2 = ggplot(beta, aes(t, beta)) +
   geom_line(linewidth = 1.3, alpha = 0.9, color = "#009E73") +
   labs(title =expression(Coefficient ~ Function ~ hat(beta)(t)), y = "Value", x = "Time (t)") +
   geom_hline(aes(yintercept = 0), linetype = "dashed")+
-  annotate(geom = "label", x = 0.25, y = 0.5, label = "Change in outcome associated with\none unit increase in X(0.25), holding\nall other values of X(t) constant", size = 5, color = "#444444", vjust = 1) +
+  annotate(geom = "label", x = 0.25, y = 0.5, label = "Weight for time t = 0.25", size = 5, color = "#444444", vjust = 1) +
   annotate(geom = "segment", x= 0.25, xend = .25, y = 0.5, yend = 1.45,
            arrow = arrow(length = unit(0.05, "inches"), type = "closed"),
            color = "#444444") +
@@ -2187,7 +2232,15 @@ p2 = ggplot(beta, aes(t, beta)) +
 p3 = ggplot(dfProd, aes(t, prod)) +
   geom_area(alpha = 0.35, fill = "#56B4E9") +
   geom_line(linewidth = 1.2, color = "#56B4E9") +
-  labs(title = expression(Contribution ~ from ~ Subject ~ 1: ~  X[1]~(t)~x~ hat(β)~(t)),, y = "Value", x = "Time (t)")
+  # labs(title = expression(Contribution ~ from ~ Subject ~ 1: ~  X[1]~(t)~x~ hat(β)~(t)),, y = "Value", x = "Time (t)")
+  labs(title = expression(Pointwise ~ contributions: ~ X[1](t) ~ times ~ hat(beta)(t)),
+       y = "Value", x = "Time (t)")
+
+p3_bar = ggplot(dfProd, aes(t, prod)) + 
+  geom_col(width = diff(range(t)) / length(t), fill = "#56B4E9", alpha = 0.8, color = "#444444") +
+  labs(title = expression(Pointwise ~ contributions: ~ X[1](t) ~ x ~ hat(beta)(t) ~ x ~ Delta(t)),
+       y = "Value", x = "Time (t)")
+
 
 p1
 
@@ -2196,39 +2249,81 @@ p1
 # vertical slice: how much predictor is contributing to the LP 
 
 # integral over t: total contribution of X_i(t) to value of Y_i
+
+
 ```
+
+::: {.notes}
+
+Highly correlated predictors 
+n << p problems
+:::
+
 
 ---
 
 ### Functional regression: background
 
+Instead of estimating a separate coefficient at each time point:
 
-Sometimes our predictor is a curve over time (i.e., function) rather than a single value
+$$
+Y_i = \alpha + \sum_{k=1}^T \beta_k X_i(t_k)
+$$
 
-We can model an outcome as a function of this curve: 
+We model the coefficients as a **smooth function of time**:
 
-$$Y_i = \alpha + \int X_i(t)\beta(t)dt + \epsilon_i$$
+$$
+Y_i \approx \alpha + \sum_{k=1}^T X_i(t_k)\,\beta(t_k)\,\Delta t + \epsilon_i
+$$
+
+(**Riemann sum** approximation; in the limit, this becomes an integral)
+
+
+---
+
+### Functional regression: background
+
+Instead of estimating a separate coefficient at each time point:
+
+$$
+Y_i = \alpha + \sum_{k=1}^T \beta_k X_i(t_k) +\epsilon_i
+$$
+
+---
+
+
+
+### Functional regression: background
+
+$$
+Y_i \approx \alpha + \sum_{k=1}^T X_i(t_k)\,\beta(t_k)\,\Delta t + \epsilon_i
+$$
 
 ```{r freg2}
 p2
 ```
 
+::: {.notes}
+X_i(t_k): value of curve at t_k
+beta(t_k): weight at time t_k
+delta t: width of each time bin
+:::
+
 ---
+
 
 ### Functional regression: background
 
-
-Sometimes our predictor is a curve over time (i.e., function) rather than a single value
-
-We can model an outcome as a function of this curve: 
-
-$$Y_i = \alpha + \int X_i(t)\beta(t)dt + \epsilon_i$$
+$$
+Y_i \approx \alpha + \sum_{k=1}^T X_i(t_k)\,\beta(t_k)\,\Delta t + \epsilon_i
+$$
 
 ```{r freg3}
-p3 
+p3_bar
 ```
 
 ---
+
 
 ### Functional regression: background
 
@@ -2236,8 +2331,27 @@ p3
 + Can generalize to more dimensions
 + Instead of a curve, the functional coefficient becomes a multivariate surface 
 
+```{r freg surface 2}
+#| cache: true
+dd1 %>% 
+  mutate(lag = "Lag = 0.01s") %>% 
+  bind_rows(dd2 %>% mutate(lag = "Lag = 0.02s")) %>% 
+  bind_rows(dd50 %>% mutate(lag = "Lag = 0.50s")) %>% 
+  bind_rows(dd99 %>% mutate(lag = "Lag = 0.99s")) %>% 
+  ggplot(aes(x=vm, y=lag_vm, color = density)) +
+  geom_point(size = 0.9, alpha = 0.8) +
+  facet_grid(.~lag) +
+  scale_color_viridis(name = "Density", option = "B") +
+  labs(x = "Acceleration (g)", y = "Lagged Acceleration (g)") +
+  scale_x_continuous(limits = c(0,3)) +
+  scale_y_continuous(limits = c(0,3)) 
+
+
+```
+
 
 ```{r freg surface}
+#| include: false 
 # Simulate a smoother grid
 t = seq(0, 1, length.out = 50)
 s = seq(0, 1, length.out = 50)
@@ -2358,6 +2472,7 @@ $v_{ij}(s)$ = $s^{th}$ acceleration observation for subject $i$ in second $j$
 $F(\cdot, \cdot, \cdot)$: trivariate smooth function, takes values at every point in the domain of acceleration, lag acceleration, lag length
 
 Fit using penalized splines with a quadratic penalty on the functional coefficient [@Wood2016]
+
 </div>
 ---
 
@@ -2508,9 +2623,10 @@ Rank-1 (rank-5) % accuracies
 - Can we identify someone from their walking pattern measured by a wrist-worn accelerometer? *(Digital fingerprinting)*
 <br>
 $\rightarrow$ Yes! 
+
 - <span style="color:gray;">Can we identify someone from their walking pattern measured by a wrist-worn accelerometer in big, free-living datasets?</span>
-  - <span style="color:gray;">Can we accurately find walking and count steps in free-living datasets? </span>
-  - <span style="color:gray;">Can we generalize conclusions from free-living accelerometry data to the US population?</span> 
+
+- <span style="color:gray;"> What else can we learn from walking patterns in free-living data? </span>
 - <span style="color:gray;">Can we apply these methods to other high-density data sources? </span>
 </div>
 
@@ -2523,363 +2639,11 @@ $\rightarrow$ Yes!
 <br>
 <span style="color:gray;">$\rightarrow$ Yes! </span>
 - Can we identify someone from their walking pattern measured by a wrist-worn accelerometer in big, free-living datasets?
-  - <span style="color:gray;">Can we accurately find walking and count steps in free-living datasets? </span>
-  - <span style="color:gray;">Can we generalize conclusions from free-living accelerometry data to the US population?</span> 
+- <span style="color:gray;"> What else can we learn from walking patterns in free-living data? </span>
 - <span style="color:gray;">Can we apply these methods to other high-density data sources? </span>
 </div>
 
----
 
-## Outline {.question-bullets}
-<div style="font-size: 115%;">
-- <span style="color:gray;">Can we identify someone from their walking pattern measured by a wrist-worn accelerometer? *(Digital fingerprinting)* </span>
-<br>
-<span style="color:gray;">$\rightarrow$ Yes! </span>
-- Can we identify someone from their walking pattern measured by a wrist-worn accelerometer in big, free-living datasets?
-  - Can we accurately find walking and count steps in free-living datasets? 
-  - <span style="color:gray;">Can we generalize conclusions from free-living accelerometry data to the US population?</span> 
-- <span style="color:gray;">Can we apply these methods to other high-density data sources? </span>
-
-
-</div>
-
-# Can we accurately find walking and count steps in free-living datasets?
-
-
-
-# Can we accurately find walking and count steps in free-living datasets?
-
-Yes! See Appendix 
-
-::: {.notes}
-Wrote a validation paper where I tracked down data sets with gold standard step counts and free living accelerometry data, compared performance of open source algorithms, and found "best" algorithm. Then applied these algorithms in NHANES. 
-
-:::
-
----
-
-
-
-### Application: idenfiying walking and counting steps in NHANES 
-
-+ $>15,000$ participants
-+ $7$ days of wrist accelerometry
-+ $10$Tb of data 
-+ Over 1 year computation time 
-+ Open source processing pipeline 
-+ Publicly available data repository 
-+ **First** nationally representative estimate of steps in the US population using open source algorithms
-
-![](figs/physionet.png){width=70%}
-<div style=" position: absolute; bottom: 0.5em; right: -4em; font-size: 0.7em; color: #777; "> @physionet </div>
-
----
-
-### Application: idenfiying walking and counting steps in NHANES 
-
-How many average daily steps do Americans take?
-
-```{r ridges}
-#| cache: true 
-
-xdf = steps %>% 
-  select(age = age_in_years_at_screening, gender, (contains("total") & contains("step"))) %>% 
-  mutate(age = if_else(is.na(age), 0, age)) %>% 
- mutate(age_cat = cut(age, breaks = c(0, 17, 29, 39, 49, 59, 69, Inf)), include.lowest = TRUE) 
-
-m_ya = median(xdf$total_scsslsteps[xdf$age_cat == "(17,29]"])
-m_child  = median(xdf$total_scsslsteps[xdf$age_cat == "(0,17]"])
-m_old = median(xdf$total_scsslsteps[xdf$age_cat == "(69,Inf]"])
-
-
-xdf %>% 
-  select(age_cat, steps = total_scsslsteps) %>% 
-  ggplot(aes(x = steps, y = age_cat, fill = after_stat(x))) +
-  geom_density_ridges_gradient(scale = 3, quantile_lines = TRUE, quantiles = 2) +
-  scale_fill_viridis_c(option = "B", name = "") +
-  scale_x_continuous(limits=c(0,25000),
-                     labels = seq(0, 30, 5),
-                     breaks = seq(0, 30000, 5000)) +
-  scale_y_discrete(labels = c("<18", "18-29", "30-39", "40-49", "50-59", "60-69", "70+")) +
-  theme(legend.position = "none") + 
-  labs(x = "Average Daily Steps (x1000); Estimated by Self-Supervised Learner", y = "Age category") +
-  annotate(
-    geom = "label",
-    x = 15000,
-    y = 2,
-    label = "Median average steps <18 yrs: 9k",
-    hjust = 0,
-    color = "#444444"
-  )  +
-  annotate(geom = "segment",
-           x = 15000, xend = m_child, y = 2, yend = 2,
-    arrow = arrow(length = unit(0.1, "inches"), type = "closed"),
-    color = "white",
-    linewidth = .5
-  ) +
-  annotate(
-    geom = "label",
-    x = 8000,
-    y = 9,
-    label = "Median average steps 70+ yrs: 5k",
-    hjust = 0,
-    color = "#444444"
-  )  +
-  annotate(geom = "segment",
-           x = 8000, xend = m_old, y = 9, yend = 9,
-    arrow = arrow(length = unit(0.1, "inches"), type = "closed"),
-    color = "white",
-    linewidth = .5
-  )
-
-```
-
-::: {.notes}
-Quick summary of those results 
-Steps decrease with age (as expected)
-::: 
-
----
-
-
-### Application: idenfiying walking and counting steps in NHANES 
-
-Are more steps associated with lower mortality risk? 
-
-```{r dose response}
-#| cache: true 
-
-dose_resp %>%
-  filter(stepvar == "total_scrfsteps") %>% 
-  ggplot(aes(x = steps, y = hr))+
-  geom_line(linewidth = 1) +
-  geom_ribbon(aes(ymin = lwr, ymax = upr), alpha = 0.5,
-  linewidth = 0) +
-  scale_y_continuous(trans = "log",
-                     labels = label_number(accuracy = 0.1)) +
-  scale_x_continuous(breaks=seq(2000, 20000, 2000), limits = c(2000, 20000),
-                     labels = seq(2, 20, 2)) +
-  geom_hline(aes(yintercept = 1), linetype = "dashed") +
-  labs(x = "Daily Steps (x1000); Estimated by Self-Supervised Learner", y = "Hazard Ratio (compared to 2000 steps/day)", title = "Steps and Mortality", subtitle = "Individuals aged 50 and older") +
-  theme(legend.position = "none") +
-  geom_rug(data = rug_dat, aes(x = value), sides = "b", color = "#D55E00", size = 0.5, alpha = 0.5) +
-  annotate(geom = "label", x = 8000, y = 2, label = "Significantly lower hazard of mortality\nfor 8k steps/day compared to 2k steps/day", hjust = 0) +
-  annotate(geom = "curve", x = 10000, xend = 8000, y = 1.6, yend = 0.9, curvature = -0.2,
-    arrow = arrow(length = unit(0.1, "inches"), type = "closed"),
-    color = "#444444",
-    linewidth = .5) +
-  annotate(geom = "label", x = 2000, y = 0.1, color = "#D55E00", label = "Mortality events", hjust = 0) 
-```
-
-<div style=" position: absolute; bottom: 0.5em; right: -4em; font-size: 0.7em; color: #777; "> @nhanes_steps </div>
-
----
-
-## Outline {.question-bullets}
-
-<div style="font-size: 115%;">
-
-- <span style="color:gray;">Can we identify someone from their walking pattern measured by a wrist-worn accelerometer? *(Digital fingerprinting)* </span>
-<br>
-<span style="color:gray;">$\rightarrow$ Yes! </span>
-- <span style="color:gray;">Can we identify someone from their walking pattern measured by a wrist-worn accelerometer in big, free-living datasets?</span>
-  - Can we accurately find walking and count steps in free-living datasets? 
-<br>
-  $\rightarrow$ Yes! 
-  - <span style="color:gray;">Can we generalize conclusions from free-living accelerometry data to the US population?</span> 
-
-- <span style="color:gray;">Can we apply these methods to other high-density data sources? </span>
-</div>
-
----
-
-## Outline {.question-bullets}
-<div style="font-size: 115%;">
-- <span style="color:gray;">Can we identify someone from their walking pattern measured by a wrist-worn accelerometer? *(Digital fingerprinting)* </span>
-<br>
-<span style="color:gray;">$\rightarrow$ Yes! </span>
-- <span style="color:gray;">Can we identify someone from their walking pattern measured by a wrist-worn accelerometer in big, free-living datasets?</span>
-  - <span style="color:gray;">Can we accurately find walking and count steps in free-living datasets?</span> 
-<br>
-  <span style="color:gray;">$\rightarrow$ Yes! </span>
-  - Can we generalize conclusions from free-living accelerometry data to the US population?
-- <span style="color:gray;">Can we apply these methods to other high-density data sources? </span>
-</div>
-
-::: {.notes}
-Before I could get back to step counting, had a few more questions 
-:::
-
-# Can we generalize conclusions from free-living accelerometry data to the US population?
-
----
-
-### Sex differences in steps? 
-
-Do males take more steps than females? At what points during the day? 
-
-
-```{r sex diffs}
-#| cache: true 
-steps_summ %>% 
-  mutate(age_cat = factor(age_cat,labels = c("<18","18-29","30-39","40-49","50-59","60-69","70+"))) %>% 
-  ggplot(aes(x = ind, y = mean, color = gender)) + 
-  facet_grid(.~age_cat) + 
-  geom_smooth(se = FALSE) +
-  scale_color_manual(values = c("#CC79A7", "#56B4E9"), name = "") +
-  theme(legend.position = "bottom",
-        axis.text.x = element_text(size = 10))  +
-  labs(x = "Hour of the Day", y = "Steps per minute") +
-  scale_x_continuous(breaks = c(0, 6 * 60, 13 * 60, 20 * 60, 1440),
-                     labels = c("",  "6am",
-                                "1pm",  "8pm", "")) 
-
-
-
-```
-
-::: {.notes}
-We want to quantify this relationship - fit a model. Tool we have for that is FoSR. Where before we had function as predictor, it can also be an outcome. 
-:::
-
----
-
-### Function on scalar regression 
-
-<div style="font-size: 105%;">
-
-::: {.incremental}
-+ Outcome: steps profile over the course of the day (function) 
-
-+ Predictors: age, sex (scalars)
-
-+ Model: $$\mathbb{E}[\mathrm{steps}_i(s)] = \beta_0(s) + \beta_1(s)\mathbb{I}\{\mathrm{sex}_i=\mathrm{female}\} + \beta_2(s)(\mathrm{age}_i-50) $$ 
-$i$: participant; 
-$s \in \{1, \dots, 1440\}$: each minute of the day
-
-+ **Interpretation**
-  + $\beta_0(s)$: expected steps for reference sex category and age 50
-  + $\beta_1(s)$: change in steps for females compared to males, holding age constant 
-  + Can be interpreted at specific points of the day (e.g., how many more steps do males take at 12pm?) 
-
-+ **Problem**: no method exists for function on scalar regression in complex survey settings
-
-+ **Details of solution**: see Appendix
-
-</div>
-:::
-
----
-
-
-### Survey function on scalar regression: software 
-
-<div style="font-size: 2em;">
-```{r}
-#| echo: true 
-#| eval: false 
-
-model_fit = svyfosr::svyfui(steps_mat ~ age + sex,
-                            weights = survey_weight,
-                            data = steps_df,
-                            family = gaussian(),
-                            boot_type = "BRR",
-                            num_boots = 500,
-                            parallel = TRUE,
-                            seed = 2213)
-
-```
-
-</div>
-![](figs/logo_new.png){width=25%}
-<div style=" position: absolute; bottom: 0.5em; right: -4em; font-size: 0.7em; color: #777; "> @svy_package </div>
-
----
-
-
-### Survey function on scalar regression: application
-
-```{r steps application}
-#| cache: true
-unwt = plt_df_boot[[3]]
-
-brr = plt_df_boot[[1]]
-
-df2 = 
-  unwt %>% mutate(model = "Unweighted") %>% 
-  bind_rows(brr %>% mutate(model = "Weighted")) %>% 
-  filter(name %in% c("(Intercept)", "sex_bin")) %>% 
-  mutate(name = factor(name, labels = c("Intercept", "Sex: Female")),
-         model = factor(model))
-
-p1 = df2 %>% 
-  ggplot(aes(x = s, y = beta)) +
-  facet_wrap(name ~ ., scales = "free_y") +
-  geom_line(aes(color = model), linewidth = 1.2)  +
-  geom_hline(
-    data = tibble(name = "Sex: Female"),
-    aes(yintercept = 0),
-    linetype = "dashed"
-  ) +
-  scale_x_continuous(breaks= c(60, seq(240, 1440, 4 * 60)), labels = c("01:00", "04:00", "08:00", "12:00", "16:00", "20:00", "24:00")) +
-  labs(x = "Hour of Day", y = "Steps per minute") +
-  scale_color_manual(values = c("#E69F00", "#009E73FF"), name = "Model",
-                     labels = c("Unadjusted", "Survey-aware")) +
-  theme(legend.position = "bottom")
-p1
-```
-
-
----
-
-### Survey function on scalar regression: application
-
-```{r steps application w ci}
-#| cache: true
-p1 + 
-  geom_ribbon(aes(x = s, ymin = lower, ymax = upper, fill = model), alpha = .5) +
-  geom_line(aes(color = model), linewidth = 1.2)  +
-  scale_fill_manual(values = c("#E69F00", "#009E73FF"), name = "Model",
-                    labels = c("Unadjusted", "Survey-aware")) +
-  scale_color_manual(values = c("#E69F00", "#009E73FF"), name = "Model",
-                    labels = c("Unadjusted", "Survey-aware")) 
-  
-```
-
----
-
-
-## Outline {.question-bullets}
-<div style="font-size: 115%;">
-- <span style="color:gray;">Can we identify someone from their walking pattern measured by a wrist-worn accelerometer? *(Digital fingerprinting)* </span>
-<br>
-<span style="color:gray;">$\rightarrow$ Yes! </span>
-- <span style="color:gray;">Can we identify someone from their walking pattern measured by a wrist-worn accelerometer in big, free-living datasets?</span>
-  - <span style="color:gray;">Can we accurately find walking and count steps in free-living datasets? </span> 
-  <br>
-  <span style="color:gray;">$\rightarrow$ Yes! </span>
-  - Can we generalize conclusions from free-living accelerometry data to the US population?
-<br>
-  $\rightarrow$ Yes! 
-- <span style="color:gray;">Can we apply these methods to other high-density data sources? </span>
-</div>
-
----
-
-## Outline {.question-bullets}
-<div style="font-size: 115%;">
-- <span style="color:gray;">Can we identify someone from their walking pattern measured by a wrist-worn accelerometer? *(Digital fingerprinting)* </span>
-<br>
-<span style="color:gray;">$\rightarrow$ Yes! </span>
-- Can we identify someone from their walking pattern measured by a wrist-worn accelerometer in big, free-living datasets?
-  - <span style="color:gray;">Can we accurately find walking and count steps in free-living datasets? </span> 
-<br>
-  <span style="color:gray;">$\rightarrow$ Yes! </span>
-  - <span style="color:gray;">Can we generalize conclusions from free-living accelerometry data to the US population?</span>
-<br>
-  <span style="color:gray;">$\rightarrow$ Yes! </span>
-- <span style="color:gray;">Can we apply these methods to other high-density data sources? </span>
-</div>
 
 
 # Can we identify someone from their walking pattern measured by a wrist-worn accelerometer in big, free-living datasets?
@@ -2979,96 +2743,348 @@ p4 = sample_dat2 %>%
 
 ## Outline {.question-bullets}
 <div style="font-size: 115%;">
+
 - <span style="color:gray;">Can we identify someone from their walking pattern measured by a wrist-worn accelerometer? *(Digital fingerprinting)* </span>
 <br>
 <span style="color:gray;">$\rightarrow$ Yes! </span>
 - Can we identify someone from their walking pattern measured by a wrist-worn accelerometer in big, free-living datasets?
 <br>
 $\rightarrow$ Yes!
-  - <span style="color:gray;">Can we accurately find walking and count steps in free-living datasets? </span> 
-<br>
-  <span style="color:gray;">$\rightarrow$ Yes! </span>
-  - <span style="color:gray;">Can we generalize conclusions from free-living accelerometry data to the US population?</span>
-<br>
-  <span style="color:gray;">$\rightarrow$ Yes! </span>
-- Can we apply these methods to other high-density data sources? 
+- <span style="color:gray;"> What else can we learn from walking patterns in free-living data? </span>
+- <span style="color:gray;">Can we apply these methods to other high-density data sources? </span>
 </div>
 
 ---
 
+## Outline {.question-bullets}
+<div style="font-size: 115%;">
 
+- <span style="color:gray;">Can we identify someone from their walking pattern measured by a wrist-worn accelerometer? *(Digital fingerprinting)* </span>
+<br>
+<span style="color:gray;">$\rightarrow$ Yes! </span>
+- <span style="color:gray;"> Can we identify someone from their walking pattern measured by a wrist-worn accelerometer in big, free-living datasets? </span>
+<br> 
+<span style="color:gray;">$\rightarrow$ Yes! </span>
+- What else can we learn from walking patterns in free-living data? 
+- <span style="color:gray;">Can we apply these methods to other high-density data sources? </span>
+</div>
+
+
+# What else can we learn from walking patterns in free-living data? 
+
+---
+
+### Counting steps in NHANES 
+
++ $>15,000$ participants
++ $7$ days of wrist accelerometry
++ $10$Tb of data 
++ Over 1 year computation time 
++ Open source processing pipeline 
++ Publicly available data repository 
++ **First** nationally representative estimate of steps in the US population using open source algorithms
+
+![](figs/physionet.png){width=70%}
+<div style=" position: absolute; bottom: 0.5em; right: -4em; font-size: 0.7em; color: #777; "> @physionet </div>
+
+---
+
+### Counting steps in NHANES 
+
+How many average daily steps do Americans take?
+
+```{r ridges}
+#| cache: true 
+
+xdf = steps %>% 
+  select(age = age_in_years_at_screening, gender, (contains("total") & contains("step"))) %>% 
+  mutate(age = if_else(is.na(age), 0, age)) %>% 
+ mutate(age_cat = cut(age, breaks = c(0, 17, 29, 39, 49, 59, 69, Inf)), include.lowest = TRUE) 
+
+m_ya = median(xdf$total_scsslsteps[xdf$age_cat == "(17,29]"])
+m_child  = median(xdf$total_scsslsteps[xdf$age_cat == "(0,17]"])
+m_old = median(xdf$total_scsslsteps[xdf$age_cat == "(69,Inf]"])
+
+
+xdf %>% 
+  select(age_cat, steps = total_scsslsteps) %>% 
+  ggplot(aes(x = steps, y = age_cat, fill = after_stat(x))) +
+  geom_density_ridges_gradient(scale = 3, quantile_lines = TRUE, quantiles = 2) +
+  scale_fill_viridis_c(option = "B", name = "") +
+  scale_x_continuous(limits=c(0,25000),
+                     labels = seq(0, 30, 5),
+                     breaks = seq(0, 30000, 5000)) +
+  scale_y_discrete(labels = c("<18", "18-29", "30-39", "40-49", "50-59", "60-69", "70+")) +
+  theme(legend.position = "none") + 
+  labs(x = "Average Daily Steps (x1000); Estimated by Self-Supervised Learner", y = "Age category") +
+  annotate(
+    geom = "label",
+    x = 15000,
+    y = 2,
+    label = "Median average steps <18 yrs: 9k",
+    hjust = 0,
+    color = "#444444"
+  )  +
+  annotate(geom = "segment",
+           x = 15000, xend = m_child, y = 2, yend = 2,
+    arrow = arrow(length = unit(0.1, "inches"), type = "closed"),
+    color = "white",
+    linewidth = .5
+  ) +
+  annotate(
+    geom = "label",
+    x = 8000,
+    y = 9,
+    label = "Median average steps 70+ yrs: 5k",
+    hjust = 0,
+    color = "#444444"
+  )  +
+  annotate(geom = "segment",
+           x = 8000, xend = m_old, y = 9, yend = 9,
+    arrow = arrow(length = unit(0.1, "inches"), type = "closed"),
+    color = "white",
+    linewidth = .5
+  )
+
+```
+
+::: {.notes}
+Quick summary of those results 
+Steps decrease with age (as expected)
+::: 
+
+---
+
+
+### Counting steps in NHANES 
+
+Steps are more predictive of mortality than age, sex, or BMI 
+
+```{r dose response}
+#| cache: true 
+
+dose_resp %>%
+  filter(stepvar == "total_scrfsteps") %>% 
+  ggplot(aes(x = steps, y = hr))+
+  geom_line(linewidth = 1) +
+  geom_ribbon(aes(ymin = lwr, ymax = upr), alpha = 0.5,
+  linewidth = 0) +
+  scale_y_continuous(trans = "log",
+                     labels = label_number(accuracy = 0.1)) +
+  scale_x_continuous(breaks=seq(2000, 20000, 2000), limits = c(2000, 20000),
+                     labels = seq(2, 20, 2)) +
+  geom_hline(aes(yintercept = 1), linetype = "dashed") +
+  labs(x = "Daily Steps (x1000); Estimated by Self-Supervised Learner", y = "Hazard Ratio (compared to 2000 steps/day)", title = "Steps and Mortality", subtitle = "Individuals aged 50 and older") +
+  theme(legend.position = "none") +
+  geom_rug(data = rug_dat, aes(x = value), sides = "b", color = "#D55E00", size = 0.5, alpha = 0.5) +
+  annotate(geom = "label", x = 8000, y = 2, label = "Significantly lower hazard of mortality\nfor 8k steps/day compared to 2k steps/day", hjust = 0) +
+  annotate(geom = "curve", x = 10000, xend = 8000, y = 1.6, yend = 0.9, curvature = -0.2,
+    arrow = arrow(length = unit(0.1, "inches"), type = "closed"),
+    color = "#444444",
+    linewidth = .5) +
+  annotate(geom = "label", x = 2000, y = 0.1, color = "#D55E00", label = "Mortality events", hjust = 0) 
+```
+
+<div style=" position: absolute; bottom: 0.5em; right: -4em; font-size: 0.7em; color: #777; "> @nhanes_steps </div>
+
+---
+
+### Sex differences in steps in NHANES 
+
+
+```{r sex diffs}
+#| cache: true 
+steps_summ %>% 
+  mutate(age_cat = factor(age_cat,labels = c("<18","18-29","30-39","40-49","50-59","60-69","70+"))) %>% 
+  ggplot(aes(x = ind, y = mean, color = gender)) + 
+  facet_grid(.~age_cat) + 
+  geom_smooth(se = FALSE) +
+  scale_color_manual(values = c("#CC79A7", "#56B4E9"), name = "") +
+  theme(legend.position = "bottom",
+        axis.text.x = element_text(size = 10))  +
+  labs(x = "Hour of the Day", y = "Steps per minute") +
+  scale_x_continuous(breaks = c(0, 6 * 60, 13 * 60, 20 * 60, 1440),
+                     labels = c("",  "6am",
+                                "1pm",  "8pm", "")) 
+
+
+
+```
+
+::: {.notes}
+We want to quantify this relationship - fit a model. Tool we have for that is FoSR. Where before we had function as predictor, it can also be an outcome. 
+:::
+
+---
+
+### Sex differences in steps: complex survey function on scalar regression
+
+```{r steps application w ci}
+#| cache: true
+
+unwt = plt_df_boot[[3]]
+
+brr = plt_df_boot[[1]]
+
+df2 = 
+  unwt %>% mutate(model = "Unweighted") %>% 
+  bind_rows(brr %>% mutate(model = "Weighted")) %>% 
+  filter(name %in% c("(Intercept)", "sex_bin")) %>% 
+  mutate(name = factor(name, labels = c("Intercept", "Sex: Female")),
+         model = factor(model))
+
+p1 = df2 %>% 
+  ggplot(aes(x = s, y = beta)) +
+  facet_wrap(name ~ ., scales = "free_y") +
+  geom_line(aes(color = model), linewidth = 1.2)  +
+  geom_hline(
+    data = tibble(name = "Sex: Female"),
+    aes(yintercept = 0),
+    linetype = "dashed"
+  ) +
+  scale_x_continuous(breaks= c(60, seq(240, 1440, 4 * 60)), labels = c("01:00", "04:00", "08:00", "12:00", "16:00", "20:00", "24:00")) +
+  labs(x = "Hour of Day", y = "Steps per minute") +
+  scale_color_manual(values = c("#E69F00", "#009E73FF"), name = "Model") +
+  theme(legend.position = "bottom")
+
+p1 + 
+  geom_ribbon(aes(x = s, ymin = lower, ymax = upper, fill = model), alpha = .5) +
+  geom_line(aes(color = model), linewidth = 1.2)  +
+  scale_fill_manual(values = c("#E69F00", "#009E73FF"), name = "Model",
+                    labels = c("Unweighted", "BRR")) +
+  scale_color_manual(values = c("#E69F00", "#009E73FF"), name = "Model",
+                    labels = c("Unweighted", "BRR")) 
+  
+```
+
+<div style=" position: absolute; bottom: 0.5em; right: -4em; font-size: 0.7em; color: #777; "> @surveyfosr </div>
+
+----
+
+
+## Outline {.question-bullets}
+<div style="font-size: 115%;">
+
+- <span style="color:gray;">Can we identify someone from their walking pattern measured by a wrist-worn accelerometer? *(Digital fingerprinting)* </span>
+<br>
+<span style="color:gray;">$\rightarrow$ Yes! </span>
+- <span style="color:gray;"> Can we identify someone from their walking pattern measured by a wrist-worn accelerometer in big, free-living datasets? </span>
+<span style="color:gray;">$\rightarrow$ Yes! </span>
+<br>
+- <span style="color:gray;">What else can we learn from walking patterns in free-living data? </span>
+- Can we apply these methods to other high-density data sources? 
+</div>
+
+
+
+# Working with other high density data sources
+
+---
 
 ### Hemodynamics and cardiac surgery 
+
 
 :::: {.columns}
 
 ::: {.column width="60%"}
+![](figs/patient_setup.jpg)
 
-+ Hemodynamics: how blood flows through your body
-+ Modifiable risk factor for adverse outcomes after surgery
-  + Mean arterial pressure (MAP): average pressure pushing blood through vessels, important for organ perfusion
-  + Central venous pressure (CVP): pressure of blood returning to heart 
-
-:::
+::: 
 
 ::: {.column width="40%"}
 
-![](figs/map_cvp.jpeg){width=90%}
-
-:::
+::: 
 
 ::::
 
 ---
 
-#### Pipeline for processing, analysis, and visualization
+### Hemodynamics and cardiac surgery 
 
-```{r hemo vis}
-hemo_ts_plotdf %>% 
-  mutate(cat_cpb = factor(cat_cpb, levels = c("pre", "intra", "post"),
-                          labels= c("Pre", "Intra", "Post"))) %>% 
-  ggplot(aes(x = time_elaps, y = value, color = cat_cpb)) + 
-  geom_step() + 
-  facet_wrap(param ~ ., scales = "free_y", nrow = 2) + 
+
+:::: {.columns}
+
+::: {.column width="60%"}
+![](figs/patient_setup.jpg)
+
+::: 
+
+::: {.column width="40%"}
+<div style="font-size: 150%;">
+
++ Hemodynamics: how blood flows through your body
++ Modifiable risk factor for adverse outcomes after surgery, including acute kidney injury (AKI)
+
+</div>
+::: 
+
+::::
+
+
+
+---
+
+#### Hemodynamics and AKI 
+
+Time series for two different CABG patients
+
+```{r akiplt}
+#| cache: true 
+
+start_end_df =
+  hts %>% 
+  filter(id %in% c(aki_id, noaki_id) & cat_anes == "intra") %>% 
+  # mutate(val_CVP = if_else(cat_cpb == "intra", NA_real_, val_CVP)) %>% 
+  group_by(id) %>% 
+  mutate(start = min(time)) %>% 
+  mutate(time_elaps = as.numeric(difftime(time, start,
+                               units = "hours"))) %>% 
+  summarize(start = min(time_elaps[cat_cpb == "intra"]),
+            end = max(time_elaps[cat_cpb == "intra"])) %>% 
+  ungroup() %>% 
+  mutate(id2 = if_else(id == aki_id, "Developed AKI", "Did not develop AKI")) 
+
+hts %>% 
+  filter(id %in% c(aki_id, noaki_id) & cat_anes == "intra") %>% 
+  group_by(id) %>% 
+  mutate(start = min(time)) %>% 
+  ungroup() %>% 
+  mutate(time_elaps = as.numeric(difftime(time, start,
+                               units = "hours"))) %>% 
+  mutate(id2 = if_else(id == aki_id, "Developed AKI", "Did not develop AKI")) %>% 
+  pivot_longer(cols = c(val_MAP, val_CVP), names_to = "param", values_to = "value") %>% 
+  mutate(param = factor(param, labels = c("CVP", "MAP"))) %>% 
+  ggplot(aes(x = time_elaps, y = value, color = param)) + 
+  facet_grid(param ~ id2, scales = "free_y") +
   labs(x = "Time since start of surgery (hours)", y = "Value (mmHg)") + 
-  scale_color_manual(values = c("#E69F00", "#56B4E9", "#009E73"), name = "Cardiopulmonary Bypass (CPB) Status") +
-  theme(legend.position = "bottom",
-        legend.text = element_text(size = 12),
-        legend.title = element_text(size = 14)) + 
+  scale_color_manual(values = c("#56B4E9", "#009E73")) +
+  theme(legend.position = "none") +
+  geom_vline(data = start_end_df, aes(xintercept = start), color = "#444444", linetype = "dashed") +
+  geom_vline(data = start_end_df, aes(xintercept = end), color = "#444444", linetype = "dashed") +
+  geom_step(linewidth = 1) +
+  geom_label(data = tibble(id2 = "Developed AKI", param = "MAP"),
+            aes(x =  (2.72 + 3.98)/2, y = 130, label = "Bypass period"), color = "#444444") +
+  geom_label(data = tibble(id2 = "Did not develop AKI", param = "MAP"),
+            aes(x = (3.28 + 5.4)/2, y = 130, label = "Bypass period"), color = "#444444") +
   scale_x_continuous(breaks=seq(0, 7, 1)) 
+
 
 ```
 
 <div style=" position: absolute; bottom: 0.5em; right: -4em; font-size: 0.7em; color: #777; "> @blood </div>
 
+::: {.notes}
++ Mean arterial pressure (MAP): average pressure pushing blood through vessels, important for organ perfusion
++ Central venous pressure (CVP): pressure of blood returning to heart 
+:::
+
 --- 
 
-#### Hemodynamic states and acute kidney injury (AKI)
+#### Hemodynamics and AKI 
 
-```{r recommended}
-hemo_ts_plotdf %>% 
-  ggplot(aes(x = time_elaps, y = value)) + 
-  facet_wrap(param ~ ., nrow = 2, scales = "free_y") + 
-  geom_point(size = 0.8, aes(color = factor(danger))) + 
-  # geom_line() + 
-  labs(x = "Time since start of surgery (hours)", y = "Value (mmHg)") +
-  theme(legend.position = "bottom",
-        legend.text = element_text(size = 12),
-        legend.title = element_text(size = 14)) + 
-  scale_color_manual(values = c("#000000", "#56B4E9"),
-                     name = "Within recommended range (from literature)",
-                     labels = c("Yes", "No")) +
-    scale_x_continuous(breaks=seq(0, 7, 1)) 
-
-
-```
-
----
-
-#### Hemodynamic states and acute kidney injury
 
 ```{r shell plot}
-
+#| cache: true 
 g1 = "#AEC0F7"
 g2 = "#FFFFFF"
 g3 = "#FFE1E1"
@@ -3082,14 +3098,18 @@ res_plot =
               select(group, pval, cut_MAP, cut_CVP, estimate) %>% 
               rename(pval_multi = pval,
                      estimate_multi = estimate) %>% 
-  mutate(estimate_multi2 = c(0.93, 1.01, 1.02, 1.03, 1.06))
+  mutate(estimate_multi2 = c(0.93, 1.01, 1.02, 1.03, 1.06)) %>% 
+    mutate(num = sub(".*group\\_", "", group),
+         group_lab = paste0("Zone ", num))
 
 plotdf %>%
+  mutate(num = sub(".*group\\_", "", group),
+         group_lab = glue::glue("Zone ", num)) %>% 
   ggplot(aes(
     x = cut_MAP,
     y = cut_CVP,
     fill = group
-  )) + geom_tile(col = "#444444") +
+  )) + geom_tile(col = "grey", linewidth = .5) +
   labs(
     x = "MAP Range (mmHg)",
     y = "CVP Range (mmHg)",
@@ -3100,66 +3120,25 @@ plotdf %>%
   theme(legend.position = "none")+
   geom_label(data = res_plot, 
              aes(x = cut_MAP, y = cut_CVP,
-          label = paste0("OR = ", estimate_multi2, "\n", pval_multi)),
-             col = "black", hjust = 0) +
+          label = paste0(group_lab, "\n", "OR = ", estimate_multi2, "\n", pval_multi)),
+             col = "black", hjust = 0, size = 5) +
   labs(title = "Odds Ratios of AKI",
     subtitle = "Associated with spending 5 additional minutes in given zone")
 
 ```
 
 <div style=" position: absolute; bottom: 0.5em; right: -4em; font-size: 0.7em; color: #777; "> @fine_mapping </div>
----
 
-#### Hemodynamic states and acute kidney injury
-
-```{r our work recommends}
-hemo_ts_plotdf  %>% 
-  filter(!is.na(danger2)) %>% 
-  ggplot(aes(x = time_elaps, y = value)) + 
-  facet_wrap(param ~ ., scales = "free_y", nrow = 2) + 
-  geom_point(size = 0.8, aes(color = factor(danger2))) + 
-  # geom_line() + 
-  labs(x = "Time since start of surgery (hours)", y = "Value (mmHg)") +
-  theme(legend.position = "bottom",
-        legend.text = element_text(size = 12),
-        legend.title = element_text(size = 14)) + 
-  scale_color_manual(values = c("#000000", "#56B4E9"),
-                     name = "Within recommended range (from our work)",
-                     labels = c("Yes", "No")) +
-    scale_x_continuous(breaks=seq(0, 7, 1)) 
-
-
-```
-
-
----
-
-#### Hemodynamic states and acute kidney injury
-
-
-```{r how did it change}
-hemo_ts_plotdf %>% 
-  filter(!is.na(danger2)) %>% 
-  ggplot(aes(x = time_elaps, y = value)) + 
-  facet_wrap(param ~ ., nrow = 2, scales = "free_y") + 
-  geom_point(size = 0.8, aes(color = factor(change))) + 
-  # geom_line() + 
-  labs(x = "Time since start of surgery (hours)", y = "Value (mmHg)") +
-  theme(legend.position = "bottom",
-        legend.text = element_text(size = 12),
-        legend.title = element_text(size = 14)) + 
-  scale_color_manual(values = c("darkgrey", "#D55E00"),
-                     name = "Change with our analysis") +
-    scale_x_continuous(breaks=seq(0, 7, 1)) 
-
-```
-
+::: {.notes}
+Take something "simple" - time series - and make more complex (image) 
+::: 
 
 ----
 
-#### Hemodynamics states and length of stay 
+#### Hemodynamics and length of stay 
 
 ```{r los}
+#| cache: true 
 # quartiles = quantile(df_surv$group_5, seq(0, 1, .25)); quartiles
 df_surv = 
   df_surv %>% 
@@ -3185,6 +3164,24 @@ ggsurvplot(
    ggtheme = theme_minimal()
 ) 
 ```
+
+---
+
+### Hemodynamics publications
+
++ Fine-Mapping the Association of Acute Kidney Injury With Mean Arterial and Central Venous Pressures During Coronary Artery Bypass Surgery [@fine_mapping]
++ Occurrence of Low Cardiac Index During Normotensive Periods in Cardiac Surgery: A Prospective Cohort Study Using Continuous Noninvasive Cardiac Output Monitoring [@ci]
++ Assessment of Renal Vein Stasis Index by Transesophageal Echocardiography During Cardiac Surgery: A Feasibility Study [@rvsi]
++ Assessment of Renal Vein Flow Index by Transesophageal Echocardiography: Precision, Variability, and Association with Cardiac Index During Cardiac Surgery [@rvsi2]
++ Low Cardiac Index During Periods of Hypotension and Risk of Acute Kidney Injury in Cardiac Surgery. Goeddel, Koffman et al. 2025. *Under review*
++ Hemodynamic zones of arterial and venous pressure determine risk of kidney injury in cardiac surgery. Goeddel, Zhou, Hernandez, Koffman et al. 2025. *Under review*
+
+
+::: {.notes}
+
+What else is transportable? 
+
+:::
 
 ---- 
 
@@ -3391,18 +3388,6 @@ pt1 + pt2
 
 ---
 
-### Fingerprinting with arterial waveform
-
-<div style="font-size: 150%;">
-
-+ Obtain predictors for many different lags and cut points
-+ Use predictors that are top 10 contributors to first 30 PCs ($\approx$ 100 predictors)
-+ Fit XGBoost model on 727 patients
-+ Mean (SD)  7 (1.8) minutes per patient, range 3-16 minutes
-
-</div>
-
----
 
 ### Fingerprinting with arterial waveform
 
@@ -3596,8 +3581,30 @@ xdf %>%
 
 ---
 
-### Function on scalar regression: implementation 
+### Function on scalar regression 
 
+<div style="font-size: 115%;">
+
+::: {.incremental}
++ Outcome: steps profile over the course of the day (function) 
+
++ Predictors: age, sex (scalars)
+
++ Model: $$\mathbb{E}[\mathrm{steps}_i(s)] = \beta_0(s) + \beta_1(s)\mathbb{I}\{\mathrm{sex}_i=\mathrm{female}\} + \beta_2(s)(\mathrm{age}_i-50) $$ 
+$i$: participant; 
+$s \in \{1, \dots, 1440\}$: each minute of the day
+
++ **Interpretation**
+  + $\beta_0(s)$: expected steps for reference sex category and age 50
+  + $\beta_1(s)$: change in steps for females compared to males, holding age constant 
+  + Can be interpreted at specific points of the day (e.g., how many more steps do males take at 12pm?) 
+
+</div>
+:::
+
+---
+
+### Function on scalar regression: implementation 
 ::: {.incremental}
 
 <div style="font-size: 95%;">
@@ -3754,4 +3761,64 @@ p1 + p2 + plot_annotation(caption = "*Balanced Repeated Replication: bootstrap m
 ```
 
 <div style=" position: absolute; bottom: 0.5em; right: -4em; font-size: 0.7em; color: #777; "> @surveyfosr </div>
+
+---
+
+### Survey function on scalar regression: software 
+
+<div style="font-size: 2em;">
+```{r}
+#| echo: true 
+#| eval: false 
+
+model_fit = svyfosr::svyfui(steps_mat ~ age + sex,
+                            weights = survey_weight,
+                            data = steps_df,
+                            family = gaussian(),
+                            boot_type = "BRR",
+                            num_boots = 500,
+                            parallel = TRUE,
+                            seed = 2213)
+
+```
+
+</div>
+![](figs/logo_new.png){width=25%}
+<div style=" position: absolute; bottom: 0.5em; right: -4em; font-size: 0.7em; color: #777; "> @svy_package </div>
+
+---
+
+
+### Survey function on scalar regression: application
+
+```{r steps application}
+#| cache: true
+unwt = plt_df_boot[[3]]
+
+brr = plt_df_boot[[1]]
+
+df2 = 
+  unwt %>% mutate(model = "Unweighted") %>% 
+  bind_rows(brr %>% mutate(model = "Weighted")) %>% 
+  filter(name %in% c("(Intercept)", "sex_bin")) %>% 
+  mutate(name = factor(name, labels = c("Intercept", "Sex: Female")),
+         model = factor(model))
+
+p1 = df2 %>% 
+  ggplot(aes(x = s, y = beta)) +
+  facet_wrap(name ~ ., scales = "free_y") +
+  geom_line(aes(color = model), linewidth = 1.2)  +
+  geom_hline(
+    data = tibble(name = "Sex: Female"),
+    aes(yintercept = 0),
+    linetype = "dashed"
+  ) +
+  scale_x_continuous(breaks= c(60, seq(240, 1440, 4 * 60)), labels = c("01:00", "04:00", "08:00", "12:00", "16:00", "20:00", "24:00")) +
+  labs(x = "Hour of Day", y = "Steps per minute") +
+  scale_color_manual(values = c("#E69F00", "#009E73FF"), name = "Model") +
+  theme(legend.position = "bottom")
+p1
+```
+
+
 
