@@ -207,6 +207,30 @@ animate(
 )
 anim_save(here::here("docs", "figs", "fingerprint2.gif"), renderer = gifski_renderer())
 
+p = ggplot(plot_df, aes(x=vm, y=lag_vm, group = time, color = density)) +
+  geom_point(alpha = 0.5, size = 0.9) +
+  scale_color_viridis(name = "Density", option = "B") +
+  labs(x = "Acceleration (g)", y = "Lag Acceleration (g)") +
+  scale_x_continuous(limits = c(0,3)) +
+  scale_y_continuous(limits = c(0,3)) +
+  coord_cartesian(clip = "off") +
+  theme(plot.margin = margin(40, 20, 40, 40),
+        axis.title.x = element_text(vjust = 1.5),
+        axis.title.y = element_text(vjust = -1.2),
+        legend.title = element_text(vjust = -1))
+
+p_anim = p +  transition_reveal(time) +
+  view_follow(fixed_y = TRUE, fixed_x = TRUE)
+animate(
+  p_anim,
+  fps = 10,
+  width = 800,
+  height = 600,
+  res = 150,
+  renderer = gifski_renderer()
+)
+anim_save(here::here("docs", "figs", "fingerprint3.gif"), renderer = gifski_renderer())
+
 
 p_anim2 = dens_df %>%
   ggplot(aes(x = time, y = vm)) +

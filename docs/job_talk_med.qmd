@@ -36,6 +36,7 @@ bibliography: references.bib
 
 library(patchwork)
 library(tidyverse)
+library(plotly)
 library(ggridges)
 library(paletteer)
 library(viridis)
@@ -299,6 +300,56 @@ dens_df_s6_l30 =
 dens_df_s6_l30$density = get_density(dens_df_s6_l30$vm, dens_df_s6_l30$lag_vm, n = 100)
 
 ### more densities 
+
+get_dens = function(lag_tmp){
+  dd =
+    iu_dat %>%
+    filter(ID2 == 2) %>% 
+    mutate(time = (row_number() / 100) - 0.01) %>%
+    mutate(s = floor(time)) %>%
+    filter(s <= 240) %>%
+    group_by(s) %>%
+    mutate(lag_vm = lag(vm, n = lag_tmp)) %>%
+    ungroup()  %>%
+    drop_na()
+  
+  dd$density = get_density(dd$vm, dd$lag_vm, n = 100)
+  return(dd %>% mutate(lag = lag_tmp))
+}
+
+dens_res = map_dfr(.x = seq(5, 99, 10),
+                   .f = get_dens) %>% 
+  mutate(lag = lag / 100)
+
+dens_res = 
+  dens_res %>% 
+  mutate(across(c(vm, lag_vm), ~if_else(.x > 3 | .x < 0, NA, .x)))
+
+
+get_dens2 = function(lag_tmp){
+  dd =
+    iu_dat %>%
+    filter(ID2 == 2) %>% 
+    mutate(time = (row_number() / 100) - 0.01) %>%
+    mutate(s = floor(time)) %>%
+    filter(s <= 1) %>%
+    group_by(s) %>%
+    mutate(lag_vm = lag(vm, n = lag_tmp)) %>%
+    ungroup()  %>%
+    drop_na()
+  
+  dd$density = get_density(dd$vm, dd$lag_vm, n = 100)
+  return(dd %>% mutate(lag = lag_tmp))
+}
+
+dens_res2 = map_dfr(.x = seq(1, 99, 1),
+                   .f = get_dens2) %>% 
+  mutate(lag = lag / 100)
+
+dens_res2 = 
+  dens_res2 %>% 
+  mutate(across(c(vm, lag_vm), ~if_else(.x > 3 | .x < 0, NA, .x)))
+
 dd1 =
   iu_dat %>%
   filter(ID2 == 2) %>% 
@@ -447,6 +498,23 @@ df_surv = read_rds(here::here("docs", "data", "temp_los_df.rds"))
 
 aki_id = "14484_377496"
 noaki_id = "75457_952257"
+
+hemo_res = read_rds(here::here("docs", "data", "bricks_regressions.rds")) %>% 
+  filter(type == "adjusted", outcome == "AKI48") %>% 
+  separate_wider_delim(term, delim = "]", names = c("MAP", "CVP", "x")) %>% 
+  mutate(map_fct = factor(MAP, levels = c("MAP[45,55", "MAP(55,65", 
+                                          "MAP(65,75", "MAP(75,85", "MAP(85,95", "MAP(95,105", "MAP(105,115"),
+                          labels = c("[45,55]", "(55,65]", "(65,75]",
+                                     "(75,85]", "(85,95]", "(95,105]",
+                                     "(105,115]")),
+         cvp_fct = factor(CVP, levels = c("CVP[0,2", "CVP(2,4", 
+                                          "CVP(4,6", "CVP(6,8", "CVP(8,10", "CVP(10,12", "CVP(12,14", "CVP(14,16", "CVP(16,18", 
+                                          "CVP(18,20"),
+                          labels = c("[0,2]", "(2,4]", "(4,6]",
+                                     "(6,8]", "(8,10]", "(10,12]",
+                                     "(12,14]", "(14,16]", "(16,18]", "(18,20]")))
+
+
 ```
 
 
@@ -1767,7 +1835,7 @@ s1_dens %>% mutate(id = "Person A") %>%
 ### Fingerprints summarize predictors for a given lag and are different across individuals
 
 <img src="figs/time_series2.gif" class="gif-inline">
-<img src="figs/fingerprint2.gif" class="gif-inline">
+<img src="figs/fingerprint3.gif" class="gif-inline">
 
 ---
 
@@ -2241,7 +2309,76 @@ p3_bar = ggplot(dfProd, aes(t, prod)) +
   labs(title = expression(Pointwise ~ contributions: ~ X[1](t) ~ x ~ hat(beta)(t) ~ x ~ Delta ~t),
        y = "Value", x = "Time (t)")
 
+dt = diff(range(t)) / (length(t) - 1)
 
+p3_bar = ggplot(dfProd, aes(t, prod)) + 
+  geom_col(
+    width = dt,
+    fill = "#56B4E9",
+    alpha = 0.85,
+    color = "#444444",
+    linewidth = 0.2
+  ) +
+  labs(
+    # title = expression(Riemann ~ sum: ~ sum(X[1](t[k])~hat(beta)(t[k])~Delta~t)),
+    title = "Contribution to outcome",
+    subtitle = "Each bar = one term in the sum",
+    y = expression(X[1](t)~hat(beta)(t)),
+    x = "Time (t)"
+  ) 
+ymin = min(dfProd$prod, 0)
+
+p3_bar = p3_bar +
+  geom_segment(
+    x = min(t), xend = max(t),
+    y = ymin - 0.1 * diff(range(dfProd$prod)),
+    yend = ymin - 0.1 * diff(range(dfProd$prod)),
+    linewidth = 0.8,
+    color = "#444444"
+  ) +
+  geom_segment(
+    x = min(t), xend = min(t),
+    y = ymin - 0.08 * diff(range(dfProd$prod)),
+    yend = ymin - 0.12 * diff(range(dfProd$prod)),
+    linewidth = 0.8,
+    color = "#444444"
+  ) +
+  geom_segment(
+    x = max(t), xend = max(t),
+    y = ymin - 0.08 * diff(range(dfProd$prod)),
+    yend = ymin - 0.12 * diff(range(dfProd$prod)),
+    linewidth = 0.8,
+    color = "#444444"
+  ) +
+  annotate(
+    "text",
+    x = mean(t),
+    y = ymin - 0.18 * diff(range(dfProd$prod)),
+    label = expression(paste("Total contribution  ", approx, "  ", sum(X(t[k])~beta(t[k])~Delta~t))),
+    size = 5,
+    color = "#444444"
+  )
+
+highlight_idx = c(30)
+df_highlight = dfProd %>% slice(highlight_idx)
+
+p3_bar = p3_bar +
+  geom_col(
+    data = df_highlight,
+    aes(t, prod),
+    width = dt,
+    fill = "#E69F00",
+    alpha = 0.9
+  ) +
+  annotate(
+    "label",
+    x = df_highlight$t[1],
+    y = df_highlight$prod[1] + 0.1 * diff(range(dfProd$prod)),
+    label = expression(X(t[k])~beta(t[k])~Delta~t),
+    size = 4,
+    color = "#E69F00",
+    hjust = 0
+  )
 p1
 
 # plot: pointwise contribution of the functional predictor X_i(t) to the outcome Y thru the functionalcoefficient beta(t) 
@@ -2323,7 +2460,7 @@ p3_bar
 
 ```{r freg surface 2}
 #| cache: true
-dd1 %>% 
+pp = dd1 %>% 
   mutate(lag = "Lag = 0.01s") %>% 
   bind_rows(dd2 %>% mutate(lag = "Lag = 0.02s")) %>% 
   bind_rows(dd50 %>% mutate(lag = "Lag = 0.50s")) %>% 
@@ -2335,6 +2472,98 @@ dd1 %>%
   labs(x = "Acceleration (g)", y = "Lagged Acceleration (g)") +
   scale_x_continuous(limits = c(0,3)) +
   scale_y_continuous(limits = c(0,3)) 
+
+
+df_all = dd1 %>% mutate(lag = 0.01) %>% 
+  bind_rows(dd2 %>% mutate(lag = 0.02)) %>% 
+  bind_rows(dd50 %>% mutate(lag = 0.50)) %>% 
+  bind_rows(dd99 %>% mutate(lag = 0.99))
+
+# df_all = df_all %>%
+#   mutate(lag_offset = scales::rescale(lag, to = c(0, 1)))
+
+# ggplot(df_all, aes(x = vm, y = lag_vm + 3 * lag_offset, color = density)) +
+#   geom_point(size = 0.9, alpha = 0.8) +
+#   scale_color_viridis(option = "B", name = "Density") +
+#   labs(
+#     x = "Acceleration (g)",
+#     y = "Lagged Acceleration (g)   +   Lag",
+#     title = "Joint distribution across lag (stacked slices)",
+#     subtitle = "Each sheet is a different lag — together forming a 3D predictor"
+#   ) +
+#   scale_x_continuous(limits = c(0, 3)) +
+#   scale_y_continuous(limits = c(0, 6)) 
+
+
+# plot_ly(
+#   df_all,
+#   x = ~vm,
+#   y = ~lag_vm,
+#   z = ~lag,
+#   color = ~density,
+#   colors = viridis::viridis(100, option = "B"),
+#   type = "scatter3d",
+#   mode = "markers",
+#   marker = list(size = 2, opacity = 0.8)
+# ) %>%
+#   layout(
+#     scene = list(
+#       xaxis = list(title = "Acceleration"),
+#       yaxis = list(title = "Lagged Acceleration"),
+#       zaxis = list(title = "Lag (s)")
+#     )
+#   )
+
+  
+plot_ly(
+  dens_res2,
+  x = ~vm,
+  y = ~lag_vm,
+  z = ~lag,
+  # color = ~density,
+  # colors = viridis::viridis(100, option = "B"),
+  type = "scatter3d",
+  mode = "markers",
+  marker = list(size = 1, opacity = 0.5, color = "black")
+) %>%
+  layout(
+    margin = list(l = 30, r = 30, b = 30, t = 30),
+    title = "Predictors for one person and one second",
+    scene = list(
+      xaxis = list(title = "Acceleration (g)"),
+      yaxis = list(title = "Lag Acceleration (g)"),
+      zaxis = list(title = "Lag (s)")
+    )
+  ) 
+```
+
+---
+
+### Functional regression: background
+
+
+```{r freg surface 3}
+#| cache: true 
+plot_ly(
+  dens_res,
+  x = ~vm,
+  y = ~lag_vm,
+  z = ~lag,
+  color = ~density,
+  colors = viridis::viridis(100, option = "B"),
+  type = "scatter3d",
+  mode = "markers",
+  marker = list(size = 1, opacity = 0.5)
+) %>%
+  layout(
+    title = "Subset of predictors for one person, all seconds",
+    margin = list(l = 30, r = 30, b = 30, t = 30),
+    scene = list(
+      xaxis = list(title = "Acceleration (g)"),
+      yaxis = list(title = "Lag Acceleration (g)"),
+      zaxis = list(title = "Lag (s)")
+    )
+  ) 
 
 
 ```
@@ -3072,6 +3301,67 @@ hts %>%
 
 #### Hemodynamics and AKI 
 
+```{r bivar plot}
+#| cache: true
+hemo_res %>%
+  ggplot(aes(
+    x = map_fct,
+    y = cvp_fct,
+    fill = estimate,
+    label = format(estimate, digits = 2, nsmall = 2)
+  )) +
+  geom_tile(color = "black") +
+  geom_text() +
+  scale_fill_binned(
+    guide = "colorsteps",
+    palette = function(x)
+      c(
+        "#5D82F0",
+        "#7897F2" ,
+        "#93ACF5" ,
+        "#AEC0F7",
+        "#C9D5FA",
+        "#E4EAFC",
+        "#FFFFFF"
+        ,
+        "#FFE1E1",
+        "#FFC3C3",
+        "#FFA6A6" ,
+        "#FF8888" ,
+        "#FF6B6B" ,
+        "#FF4D4D",
+        "#FF3030"
+      ),
+    breaks = c(
+      0.5,
+      0.6,
+      0.7,
+      0.8,
+      0.9,
+      0.97,
+      1.02,
+      1 / 0.9,
+      1 / 0.8,
+      1 / 0.7,
+      1 / 0.6,
+      1 / 0.5,
+      1 / 0.4,
+      round(max(hemo_res$estimate + .1), 1)
+    )) +
+  theme(legend.position = "none") +
+  labs(
+   x = "MAP Range (mmHg)",
+    y = "CVP Range (mmHg)",
+    title = "Odds Ratios of AKI",
+    subtitle = "Associated with spending 5 additional minutes in given range"
+  )
+  
+```
+
+
+---
+
+### Hemodynamics and AKI 
 
 ```{r shell plot}
 #| cache: true 
