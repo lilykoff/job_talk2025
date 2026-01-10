@@ -301,10 +301,10 @@ dens_df_s6_l30$density = get_density(dens_df_s6_l30$vm, dens_df_s6_l30$lag_vm, n
 
 ### more densities 
 
-get_dens = function(lag_tmp){
+get_dens = function(lag_tmp, id = 2){
   dd =
     iu_dat %>%
-    filter(ID2 == 2) %>% 
+    filter(ID2 == id) %>% 
     mutate(time = (row_number() / 100) - 0.01) %>%
     mutate(s = floor(time)) %>%
     filter(s <= 240) %>%
@@ -319,10 +319,13 @@ get_dens = function(lag_tmp){
 
 dens_res = map_dfr(.x = seq(5, 99, 10),
                    .f = get_dens) %>% 
-  mutate(lag = lag / 100)
+  mutate(lag = lag / 100) %>% 
+  mutate(across(c(vm, lag_vm), ~if_else(.x > 3 | .x < 0, NA, .x)))
 
-dens_res = 
-  dens_res %>% 
+dens_res6 = map_dfr(.x = seq(5, 99, 10),
+                   .f = get_dens,
+                   id = 6) %>% 
+  mutate(lag = lag / 100) %>% 
   mutate(across(c(vm, lag_vm), ~if_else(.x > 3 | .x < 0, NA, .x)))
 
 
@@ -2460,6 +2463,10 @@ p3_bar
 
 ```{r freg surface 2}
 #| cache: true
+#| fig-width: 14
+#| fig-height: 6.5
+#| out-width: "100%"
+
 pp = dd1 %>% 
   mutate(lag = "Lag = 0.01s") %>% 
   bind_rows(dd2 %>% mutate(lag = "Lag = 0.02s")) %>% 
@@ -2472,47 +2479,6 @@ pp = dd1 %>%
   labs(x = "Acceleration (g)", y = "Lagged Acceleration (g)") +
   scale_x_continuous(limits = c(0,3)) +
   scale_y_continuous(limits = c(0,3)) 
-
-
-df_all = dd1 %>% mutate(lag = 0.01) %>% 
-  bind_rows(dd2 %>% mutate(lag = 0.02)) %>% 
-  bind_rows(dd50 %>% mutate(lag = 0.50)) %>% 
-  bind_rows(dd99 %>% mutate(lag = 0.99))
-
-# df_all = df_all %>%
-#   mutate(lag_offset = scales::rescale(lag, to = c(0, 1)))
-
-# ggplot(df_all, aes(x = vm, y = lag_vm + 3 * lag_offset, color = density)) +
-#   geom_point(size = 0.9, alpha = 0.8) +
-#   scale_color_viridis(option = "B", name = "Density") +
-#   labs(
-#     x = "Acceleration (g)",
-#     y = "Lagged Acceleration (g)   +   Lag",
-#     title = "Joint distribution across lag (stacked slices)",
-#     subtitle = "Each sheet is a different lag — together forming a 3D predictor"
-#   ) +
-#   scale_x_continuous(limits = c(0, 3)) +
-#   scale_y_continuous(limits = c(0, 6)) 
-
-
-# plot_ly(
-#   df_all,
-#   x = ~vm,
-#   y = ~lag_vm,
-#   z = ~lag,
-#   color = ~density,
-#   colors = viridis::viridis(100, option = "B"),
-#   type = "scatter3d",
-#   mode = "markers",
-#   marker = list(size = 2, opacity = 0.8)
-# ) %>%
-#   layout(
-#     scene = list(
-#       xaxis = list(title = "Acceleration"),
-#       yaxis = list(title = "Lagged Acceleration"),
-#       zaxis = list(title = "Lag (s)")
-#     )
-#   )
 
   
 plot_ly(
@@ -2527,12 +2493,14 @@ plot_ly(
   marker = list(size = 1, opacity = 0.5, color = "black")
 ) %>%
   layout(
-    margin = list(l = 30, r = 30, b = 30, t = 30),
-    title = "Predictors for one person and one second",
+    margin = list(l = 80, r = 80, b = 80, t = 0), 
+    title = list(text = "Predictors for one person and one second", y = 0.95),
     scene = list(
       xaxis = list(title = "Acceleration (g)"),
       yaxis = list(title = "Lag Acceleration (g)"),
       zaxis = list(title = "Lag (s)")
+      # camera = list(eye = list(x = 1.5, y = 1.5, z = 1.5))
+
     )
   ) 
 ```
@@ -2541,9 +2509,12 @@ plot_ly(
 
 ### Functional regression: background
 
+```{r s4}
+#| fig-width: 14
+#| fig-height: 8
+#| cache: true
+#| out-width: "100%"
 
-```{r freg surface 3}
-#| cache: true 
 plot_ly(
   dens_res,
   x = ~vm,
@@ -2553,62 +2524,64 @@ plot_ly(
   colors = viridis::viridis(100, option = "B"),
   type = "scatter3d",
   mode = "markers",
-  marker = list(size = 1, opacity = 0.5)
+  marker = list(size = 1, opacity = 0.5) 
 ) %>%
+  colorbar(title = "Density") %>%
   layout(
-    title = "Subset of predictors for one person, all seconds",
-    margin = list(l = 30, r = 30, b = 30, t = 30),
+    title = list(text = "Subset of predictors for one person", y = 0.95),
+    # INCREASE margins here to prevent label clipping
+    margin = list(l = 80, r = 80, b = 80, t = 0), 
     scene = list(
       xaxis = list(title = "Acceleration (g)"),
       yaxis = list(title = "Lag Acceleration (g)"),
       zaxis = list(title = "Lag (s)")
+      # Optional: Adjust camera to zoom out slightly if labels still clip
+      # camera = list(eye = list(x = 1.5, y = 1.5, z = 1.5))
     )
-  ) 
+  )
 
 
 ```
 
 
-```{r freg surface}
-#| include: false 
-# Simulate a smoother grid
-t = seq(0, 1, length.out = 50)
-s = seq(0, 1, length.out = 50)
-grid = expand.grid(t = t, s = s)
+---
 
-# Smoother functional predictors and coefficients
-grid$X = sin(pi * grid$t) * cos(pi * grid$s)
-grid$beta = cos(pi * grid$t) * sin(pi * grid$s)
-grid$contrib = grid$X * grid$beta
+### Functional regression: background
 
-# Convert to matrix for persp
-z = matrix(grid$contrib, nrow = length(t), ncol = length(s))
 
-# Create colors based on z
-zrange = range(z)
-colfunc = viridis(100, option = "B")
-col_idx = as.numeric(cut(z, breaks = 100))
-cols = colfunc[col_idx]
+```{r s5}
+#| fig-width: 14
+#| fig-height: 8
+#| cache: true
+#| out-width: "100%"
 
-# Classic 3D surface plot
-persp(
-  x = t,
-  y = s,
-  z = z,
-  theta = 30,    # rotation
-  phi = 30,      # elevation
-  expand = 0.5,
-  col = cols,
-  ltheta = 120,
-  shade = 0.5,
-  ticktype = "detailed",
-  xlab= "",
-  ylab ="",
-  zlab="",
-  main = "3D Functional Regression Surface"
-)
+plot_ly(
+  dens_res6,
+  x = ~vm,
+  y = ~lag_vm,
+  z = ~lag,
+  color = ~density,
+  colors = viridis::viridis(100, option = "B"),
+  type = "scatter3d",
+  mode = "markers",
+  marker = list(size = 1, opacity = 0.5) 
+) %>%
+  colorbar(title = "Density") %>%
+  layout(
+    title = list(text = "Subset of predictors for different person", y = 0.95),
+    # INCREASE margins here to prevent label clipping
+    margin = list(l = 80, r = 80, b = 80, t = 0), 
+    scene = list(
+      xaxis = list(title = "Acceleration (g)"),
+      yaxis = list(title = "Lag Acceleration (g)"),
+      zaxis = list(title = "Lag (s)")
+      # Optional: Adjust camera to zoom out slightly if labels still clip
+      # camera = list(eye = list(x = 1.5, y = 1.5, z = 1.5))
+    )
+  )
 
 ```
+
 
 ---
 
@@ -2645,7 +2618,7 @@ where $Y_{ij}^{i_0} = 1$ if subject $i$ in second $j$ belongs to subject $i_0$, 
 
 Model: 
 
-$$\text{logit}(p_{ij}^{i_0}) =\beta_0^{i_0} + \int_{u=1}^S\int_{s=u}^SF_{i_0}\{ v_{ij}(s), v_{ij}(s-u), u\}dsdu $$
+$$\text{logit}(p_{ij}^{i_0}) = \beta_0^{i_0} + \sum_{u=1}^{S} \sum_{s=u}^{S} F_{i_0} \{ v_{ij}(s), v_{ij}(s-u), u \} $$
 </div>
 
 ---
@@ -2661,11 +2634,14 @@ where $Y_{ij}^{i_0} = 1$ if subject $i$ in second $j$ belongs to subject $i_0$, 
 
 Model: 
 
-$$\text{logit}(p_{ij}^{i_0}) =\beta_0^{i_0} + \int_{u=1}^S\int_{s=u}^SF_{i_0}\{ v_{ij}(s), v_{ij}(s-u), u\}dsdu $$
+$$\text{logit}(p_{ij}^{i_0}) = \beta_0^{i_0} + \sum_{u=1}^{S} \sum_{s=u}^{S} F_{i_0} \{ v_{ij}(s), v_{ij}(s-u), u \} $$
 
-$u = 1, \dots, S = 100$ (number of observations per second) 
+$u = 1, \dots, S$ (index of lag length)
 
-$v_{ij}(s)$ = $s^{th}$ acceleration observation for subject $i$ in second $j$
+$s = u, \dots, S$ (index of current time point)
+
+$v_{ij}(s)$ = value of acceleration for subject $i$, second $j$, at time index $s$
+
 
 $F(\cdot, \cdot, \cdot)$: trivariate smooth function, takes values at every point in the domain of acceleration, lag acceleration, lag length
 </div>
@@ -2682,11 +2658,19 @@ where $Y_{ij}^{i_0} = 1$ if subject $i$ in second $j$ belongs to subject $i_0$, 
 
 Model: 
 
-$$\text{logit}(p_{ij}^{i_0}) =\beta_0^{i_0} + \int_{u=1}^S\int_{s=u}^SF_{i_0}\{ v_{ij}(s), v_{ij}(s-u), u\}dsdu $$
+```{r}
+#| include: false 
+# $$\text{logit}(p_{ij}^{i_0}) =\beta_0^{i_0} + \int_{u=1}^S\int_{s=u}^SF_{i_0}\{ v_{ij}(s), v_{ij}(s-u), u\}dsdu $$
+```
 
-$u = 1, \dots, S = 100$ (number of observations per second) 
+$$\text{logit}(p_{ij}^{i_0}) = \beta_0^{i_0} + \sum_{u=1}^{S} \sum_{s=u}^{S} F_{i_0} \{ v_{ij}(s), v_{ij}(s-u), u \} $$
 
-$v_{ij}(s)$ = $s^{th}$ acceleration observation for subject $i$ in second $j$
+$u = 1, \dots, S$ (index of lag length)
+
+$s = u, \dots, S$ (index of current time point)
+
+$v_{ij}(s)$ = value of acceleration for subject $i$, second $j$, at time index $s$
+
 
 $F(\cdot, \cdot, \cdot)$: trivariate smooth function, takes values at every point in the domain of acceleration, lag acceleration, lag length
 
@@ -2699,7 +2683,7 @@ Fit using penalized splines with a quadratic penalty on the functional coefficie
 
 <div style="font-size: 1.8em;">
 
-```{r}
+```{r gam}
 #| eval: false
 #| echo: true 
 
@@ -2725,7 +2709,12 @@ model = mgcv::gam(
 
 + $\texttt{method="REML"}$: smoothing parameter selection with restricted maximum likelihood 
 
+::: {.notes}
+125 basis functions
+:::
+
 ---
+
 
 
 ### Connection between two methods 
@@ -3475,24 +3464,6 @@ What else is transportable?
 
 :::
 
-::: {.column width="50%"}
-
-
-:::
-
-::::
-
----
-
-### Arterial waveform 
-
-:::: {.columns}
-
-::: {.column width="50%"}
-
-![](figs/a_line.png){.equalheight}
-
-:::
 
 ::: {.column width="50%"}
 
@@ -4047,7 +4018,7 @@ p1 + p2 + plot_annotation(caption = "*Balanced Repeated Replication: bootstrap m
 ### Survey function on scalar regression: software 
 
 <div style="font-size: 2em;">
-```{r}
+```{r svfosr software}
 #| echo: true 
 #| eval: false 
 
