@@ -1,7 +1,7 @@
 ---
 title: "Methods and Applications for High-Frequency Biosignals Data"
 title-slide-attributes:
-    data-background-image: figs/koff-wfu-qr-url.png
+    data-background-image: figs/koff-talk-qr-url.png
     data-background-size: 20%
     data-background-position: 90% 90%
 subtitle: ""
@@ -13,7 +13,7 @@ format:
     slide-number: true
     toc: false
     progress: true
-    footer: tinyurl.com/koff-wfu
+    footer: tinyurl.com/koff-talk
     hash: true
     overview: true
     code-overflow: wrap
@@ -3733,14 +3733,14 @@ mean_preds %>%
 <br>
 <div style="font-size: 150%;">
 
-- Link to slides: [tinyurl.com/koff-wfu](tinyurl.com/koff-wfu) 
+- Link to slides: [tinyurl.com/koff-talk](tinyurl.com/koff-talk) 
 - Email: [lkoffma2@jh.edu](lkoffma2@jh.edu)
 - Website: [lilykoff.com](lilykoff.com)
 - Github: [github.com/lilykoff](github.com/lilykoff)
 </div>
 <br>
 
-![](figs/koff-wfu-qr.png){width=150%}
+![](figs/koff-talk-qr.png){width=150%}
 
 ---
 
