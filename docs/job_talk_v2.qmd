@@ -1,0 +1,4088 @@
+---
+title: "Methods and Applications for High-Frequency Biosignals Data"
+title-slide-attributes:
+    data-background-image: figs/koff-wfu-qr-url.png
+    data-background-size: 20%
+    data-background-position: 90% 90%
+subtitle: ""
+author: "Lily Koffman"
+institute: "Department of Biostatistics, Johns Hopkins School of Public Health" 
+format:
+  revealjs:
+    theme: custom.scss
+    slide-number: true
+    toc: false
+    progress: true
+    footer: tinyurl.com/koff-wfu
+    hash: true
+    overview: true
+    code-overflow: wrap
+    code-line-numbers: false
+    center: false
+    width: 1400
+    height: 850
+    html-math-method: mathjax
+    embed-resources: true
+code: 
+  echo: false
+  cache: true 
+editor_options: 
+  chunk_output_type: console
+bibliography: references.bib
+---
+
+```{r load packages}
+#| include: false 
+
+library(patchwork)
+library(tidyverse)
+library(plotly)
+library(ggridges)
+library(paletteer)
+library(viridis)
+library(geomtextpath)
+library(showtext)
+library(scales)
+library(ggplot2)
+library(ggrepel)
+library(broom)
+library(mgcv)
+library(survival)
+library(ggimage)
+library(cowplot)
+library(survminer)
+options(digits.secs = 3)
+
+```
+
+```{r misc functions}
+#| include: false 
+range_left = function(x, left, right){
+  ifelse(x > left & x <= right, TRUE, FALSE)
+}
+
+get_density = function(x, y, ...) {
+  dens <- MASS::kde2d(x, y, ...)
+  ix <- findInterval(x, dens$x)
+  iy <- findInterval(y, dens$y)
+  ii <- cbind(ix, iy)
+  return(dens$z[ii])
+}
+
+```
+
+```{r ggplot theme}
+#| include: false  
+
+okabe_ito <- c(
+  "#000000", "#E69F00", "#56B4E9", "#009E73",
+  "#F0E442", "#0072B2", "#D55E00", "#CC79A7"
+)
+
+showtext_auto()
+font_add_google("Source Sans Pro", "Source Sans Pro")
+theme_set(
+  theme_minimal(base_family = "Source Sans Pro") +
+    theme(
+      plot.background = element_rect(fill = "#f6f5f3", color = NA),
+      panel.background = element_rect(fill = "#f6f5f3", color = NA),
+      panel.grid.major = element_line(color = "#e1dfdb"),
+      panel.grid.minor = element_blank(),
+      axis.text = element_text(color = "#1a1a1a", size = 12),
+      axis.title = element_text(color = "#1a1a1a", size = 14),
+      plot.title = element_text(face = "bold", size = 18, color = "#000000"),
+      plot.subtitle = element_text(size = 14, color = "#444444"),
+      strip.background = element_rect(fill = "darkgrey", color = NA),
+      strip.text = element_text(color = "white", size = 12)
+    )
+)
+
+scale_color_okabe <- function(...) scale_color_manual(values = okabe_ito, ...)
+scale_fill_okabe  <- function(...) scale_fill_manual(values = okabe_ito, ...)
+
+```
+
+
+```{r data read in and processing}
+#| cache: true 
+#| include: false
+
+# --- accel data ----- # 
+walking = read_rds(here::here("docs", "data", "walking.rds"))
+driving = read_rds(here::here("docs", "data", "driving.rds"))
+cooking = read_rds(here::here("docs", "data", "cooking.rds"))
+
+# --- paper 1 results --- # 
+pred_df = read_rds(here::here("docs", "data", "paper1_preds.rds"))
+
+# --- step comparison results --- # 
+step_acc = read_rds(here::here("docs", "data", "step_stats_bysubject.rds"))
+step_res = read_rds(here::here("docs", "data", "total_steps_bysubject_redone.rds"))
+
+# --- nhanes step estimates --- # 
+steps = read_rds(here::here("docs", "data", "covariates_accel_mortality_df.rds")) %>% 
+  filter(valid_accel) 
+
+# --- nhanes mortality estimates --- # 
+dose_resp = read_rds(here::here("docs", "data", "dose_response_dat.rds"))
+rug_dat = read_rds(here::here("docs", "data", "rug_dat.rds")) %>% 
+  filter(stepvar == "Stepcount RF") %>% 
+  mutate(stepvar = "total_scrfsteps")
+
+# --- minute level steps df ---- # 
+steps_summ = read_rds(here::here("docs", "data", "step_means.rds")) 
+
+# --- survey sim results --- # 
+res_g = read_rds(here::here("docs", "data", "survey_sim_res.rds"))
+
+# ---- survey application --- # 
+plt_df_boot = read_rds(here::here("docs", "data", "step_application.rds"))
+
+# --- nh fprint ---- # 
+dens_df = read_rds(here::here("docs", "data", "dens_temp_df.rds")) 
+sample_dat2 = read_rds(here::here("docs", "data", "fingerprint_data_sample_temporal.rds"))
+
+# --- hemo data ---- # 
+hemo_data0 = read_csv(here::here("docs", "data", "1156602.csv.gz")) %>% filter(cat_anes == "intra")
+
+hemo_data = read_csv(here::here("docs", "data", "1004841.csv.gz")) %>% 
+  filter(cat_anes == "intra")
+
+# ---- hemo results --- # 
+mean_preds = read_rds(here::here("docs", "data", "mean_preds_xgb.rds"))
+
+pred_res = read_rds(here::here("docs", "data", "pred_res_df_xgb.rds"))
+
+
+correct = pred_res %>% 
+  filter(rank1 == 1)
+
+# ---- accel data ---- # 
+
+data = read_csv(here::here("docs", "data", "df_all_IU.csv"))
+
+iu_dat =
+  data %>%
+  rename(vm = signal_lw)
+
+df =
+  iu_dat %>%
+  filter(between(time, 200, 201), ID2 == 4) %>%
+  mutate(lag_vm = lag(vm, n = 15)) %>%
+  mutate(time = time - min(time))
+
+df30 =
+  iu_dat %>%
+  filter(between(time, 200, 201), ID2 == 4) %>%
+  mutate(lag_vm = lag(vm, n = 30)) %>%
+  mutate(time = time - min(time))
+
+df2 =
+  iu_dat %>%
+  filter(between(time, 201, 202), ID2 == 4) %>%
+  mutate(lag_vm = lag(vm, n = 15)) %>%
+  mutate(time = time - min(time))
+
+df2_30 =
+  iu_dat %>%
+  filter(between(time, 201, 202), ID2 == 4) %>%
+  mutate(lag_vm = lag(vm, n = 30)) %>%
+  mutate(time = time - min(time))
+
+df3 =
+  iu_dat %>%
+  filter(between(time, 101, 102), ID2 == 2) %>%
+  mutate(lag_vm = lag(vm, n = 15)) %>%
+  mutate(time = time - min(time))
+
+df3_30 =
+  iu_dat %>%
+  filter(between(time, 101, 102), ID2 == 2) %>%
+  mutate(lag_vm = lag(vm, n = 30)) %>%
+  mutate(time = time - min(time))
+
+df3_302 =
+  iu_dat %>%
+  filter(between(time, 102, 103), ID2 == 2) %>%
+  mutate(lag_vm = lag(vm, n = 30)) %>%
+  mutate(time = time - min(time))
+
+df3_152 =
+  iu_dat %>%
+  filter(between(time, 102, 103), ID2 == 2) %>%
+  mutate(lag_vm = lag(vm, n = 15)) %>%
+  mutate(time = time - min(time))
+
+df4 =
+  iu_dat %>%
+  filter(between(time, 201, 202), ID2 == 6) %>%
+  mutate(lag_vm = lag(vm, n = 15)) %>%
+  mutate(time = time - min(time))
+
+
+# ------- densities -------- # 
+dens_df_s2_l15 =
+  iu_dat %>%
+  filter(ID2 == 2) %>% 
+  mutate(time = (row_number() / 100) - 0.01) %>%
+  mutate(s = floor(time)) %>%
+  filter(s <= 240) %>%
+  group_by(s) %>%
+  mutate(lag_vm = lag(vm, n = 15)) %>%
+  ungroup()  %>%
+  drop_na()
+
+dens_df_s2_l15$density = get_density(dens_df_s2_l15$vm, dens_df_s2_l15$lag_vm, n = 100)
+
+dens_df_s2_l30 =
+  iu_dat %>%
+  filter(ID2 == 2) %>% 
+  mutate(time = (row_number() / 100) - 0.01) %>%
+  mutate(s = floor(time)) %>%
+  filter(s <= 240) %>%
+  group_by(s) %>%
+  mutate(lag_vm = lag(vm, n = 30)) %>%
+  ungroup()  %>%
+  drop_na()
+
+dens_df_s2_l30$density = get_density(dens_df_s2_l30$vm, dens_df_s2_l30$lag_vm, n = 100)
+
+dens_df_s4_l15 =
+  iu_dat %>%
+  filter(ID2 == 4) %>% 
+  mutate(time = (row_number() / 100) - 0.01) %>%
+  mutate(s = floor(time)) %>%
+  filter(s <= 240) %>%
+  group_by(s) %>%
+  mutate(lag_vm = lag(vm, n = 15)) %>%
+  ungroup()  %>%
+  drop_na()
+
+dens_df_s4_l15$density = get_density(dens_df_s4_l15$vm, dens_df_s4_l15$lag_vm, n = 100)
+
+dens_df_s4_l30 =
+  iu_dat %>%
+  filter(ID2 == 4) %>% 
+  mutate(time = (row_number() / 100) - 0.01) %>%
+  mutate(s = floor(time)) %>%
+  filter(s <= 240) %>%
+  group_by(s) %>%
+  mutate(lag_vm = lag(vm, n = 30)) %>%
+  ungroup()  %>%
+  drop_na()
+
+dens_df_s4_l30$density = get_density(dens_df_s4_l30$vm, dens_df_s4_l30$lag_vm, n = 100)
+
+dens_df_s6_l15 =
+  iu_dat %>%
+  filter(ID2 == 6) %>% 
+  mutate(time = (row_number() / 100) - 0.01) %>%
+  mutate(s = floor(time)) %>%
+  filter(s <= 240) %>%
+  group_by(s) %>%
+  mutate(lag_vm = lag(vm, n = 15)) %>%
+  ungroup()  %>%
+  drop_na()
+
+dens_df_s6_l15$density = get_density(dens_df_s6_l15$vm, dens_df_s6_l15$lag_vm, n = 100)
+
+dens_df_s6_l30 =
+  iu_dat %>%
+  filter(ID2 == 6) %>% 
+  mutate(time = (row_number() / 100) - 0.01) %>%
+  mutate(s = floor(time)) %>%
+  filter(s <= 240) %>%
+  group_by(s) %>%
+  mutate(lag_vm = lag(vm, n = 30)) %>%
+  ungroup()  %>%
+  drop_na()
+
+dens_df_s6_l30$density = get_density(dens_df_s6_l30$vm, dens_df_s6_l30$lag_vm, n = 100)
+
+### more densities 
+
+get_dens = function(lag_tmp, id = 2){
+  dd =
+    iu_dat %>%
+    filter(ID2 == id) %>% 
+    mutate(time = (row_number() / 100) - 0.01) %>%
+    mutate(s = floor(time)) %>%
+    filter(s <= 240) %>%
+    group_by(s) %>%
+    mutate(lag_vm = lag(vm, n = lag_tmp)) %>%
+    ungroup()  %>%
+    drop_na()
+  
+  dd$density = get_density(dd$vm, dd$lag_vm, n = 100)
+  return(dd %>% mutate(lag = lag_tmp))
+}
+
+dens_res = map_dfr(.x = seq(5, 99, 10),
+                   .f = get_dens) %>% 
+  mutate(lag = lag / 100) %>% 
+  mutate(across(c(vm, lag_vm), ~if_else(.x > 3 | .x < 0, NA, .x)))
+
+dens_res6 = map_dfr(.x = seq(5, 99, 10),
+                   .f = get_dens,
+                   id = 6) %>% 
+  mutate(lag = lag / 100) %>% 
+  mutate(across(c(vm, lag_vm), ~if_else(.x > 3 | .x < 0, NA, .x)))
+
+
+get_dens2 = function(lag_tmp){
+  dd =
+    iu_dat %>%
+    filter(ID2 == 2) %>% 
+    mutate(time = (row_number() / 100) - 0.01) %>%
+    mutate(s = floor(time)) %>%
+    filter(s <= 1) %>%
+    group_by(s) %>%
+    mutate(lag_vm = lag(vm, n = lag_tmp)) %>%
+    ungroup()  %>%
+    drop_na()
+  
+  dd$density = get_density(dd$vm, dd$lag_vm, n = 100)
+  return(dd %>% mutate(lag = lag_tmp))
+}
+
+dens_res2 = map_dfr(.x = seq(1, 99, 1),
+                   .f = get_dens2) %>% 
+  mutate(lag = lag / 100)
+
+dens_res2 = 
+  dens_res2 %>% 
+  mutate(across(c(vm, lag_vm), ~if_else(.x > 3 | .x < 0, NA, .x)))
+
+dd1 =
+  iu_dat %>%
+  filter(ID2 == 2) %>% 
+  mutate(time = (row_number() / 100) - 0.01) %>%
+  mutate(s = floor(time)) %>%
+  filter(s <= 240) %>%
+  group_by(s) %>%
+  mutate(lag_vm = lag(vm, n = 1)) %>%
+  ungroup()  %>%
+  drop_na()
+
+dd1$density = get_density(dd1$vm, dd1$lag_vm, n = 100)
+
+dd2 =
+  iu_dat %>%
+  filter(ID2 == 2) %>% 
+  mutate(time = (row_number() / 100) - 0.01) %>%
+  mutate(s = floor(time)) %>%
+  filter(s <= 240) %>%
+  group_by(s) %>%
+  mutate(lag_vm = lag(vm, n = 2)) %>%
+  ungroup()  %>%
+  drop_na()
+
+dd2$density = get_density(dd2$vm, dd2$lag_vm, n = 100)
+
+dd50 =
+  iu_dat %>%
+  filter(ID2 == 2) %>% 
+  mutate(time = (row_number() / 100) - 0.01) %>%
+  mutate(s = floor(time)) %>%
+  filter(s <= 240) %>%
+  group_by(s) %>%
+  mutate(lag_vm = lag(vm, n = 50)) %>%
+  ungroup()  %>%
+  drop_na()
+
+dd50$density = get_density(dd50$vm, dd50$lag_vm, n = 100)
+
+dd99 =
+  iu_dat %>%
+  filter(ID2 == 2) %>% 
+  mutate(time = (row_number() / 100) - 0.01) %>%
+  mutate(s = floor(time)) %>%
+  filter(s <= 240) %>%
+  group_by(s) %>%
+  mutate(lag_vm = lag(vm, n = 99)) %>%
+  ungroup()  %>%
+  drop_na()
+
+dd99$density = get_density(dd99$vm, dd99$lag_vm, n = 100)
+
+hts = read_rds(here::here("docs", "data", "hemo_timeseries_interp_post_exclusion.rds")) %>% 
+  as_tibble() 
+
+shell_res = read_rds(here::here("docs", "data", "shell_regressions_5.rds"))
+
+plotdf = hts %>% 
+  mutate(
+    group = case_when(
+      range_left(val_MAP, 95, 115) & between(val_CVP, 0, 8) ~ "group_1",
+      (range_left(val_MAP, 75, 95) & between(val_CVP, 0, 8)) | 
+        (range_left(val_MAP, 85, 115) & range_left(val_CVP, 8, 10)) ~ "group_2",
+      (range_left(val_MAP, 55, 75) & between(val_CVP, 0, 8)) | 
+        (range_left(val_MAP, 65, 85) & range_left(val_CVP, 8, 12)) | 
+        (range_left(val_MAP, 85, 115) & range_left(val_CVP, 10, 12)) ~ "group_3",
+      (between(val_MAP, 45, 55) & between(val_CVP, 0, 8)) | 
+        (range_left(val_MAP, 55, 65) & range_left(val_CVP, 8, 12)) | 
+        (range_left(val_MAP, 65, 115) & range_left(val_CVP, 12, 16)) | 
+        (range_left(val_MAP, 85, 115) & range_left(val_CVP, 16, 18)) ~ "group_4",
+      (between(val_MAP, 45, 55) & range_left(val_CVP, 8, 20)) | 
+        (range_left(val_MAP, 55, 65) & range_left(val_CVP, 12, 20)) | 
+        (range_left(val_MAP, 65, 85) & range_left(val_CVP, 16, 20)) | 
+        (range_left(val_MAP, 85, 115) & range_left(val_CVP, 18, 20)) ~ "group_5"
+    ),
+    cut_MAP = cut(
+      val_MAP,
+      breaks = seq(45, 115, 10),
+      include.lowest = T
+    ),
+    cut_CVP = cut(
+      val_CVP,
+      breaks = seq(0, 20, 2),
+      include.lowest = T
+    )
+  ) %>%
+  dplyr::count(cut_MAP, cut_CVP, group, .drop = F) %>% 
+  drop_na() %>% group_by(cut_MAP, cut_CVP, group) %>%
+  summarize(mean = mean(n)) 
+
+              
+multi_results_plt = 
+  shell_res %>% 
+  filter(grepl("group", term)) %>%
+  bind_cols(cut_MAP = c("(95,105]", "(75,85]", "(55,65]", "(95,105]", 
+                        "[45,55]"),
+            cut_CVP = c("(2,4]", "(2,4]", "(4,6]", "(14,16]", "(14,16]")) %>% 
+  rename(group = term) %>% 
+  mutate(pval = ifelse(p.value < 0.001, "p < 0.001", paste0("p = ", round(p.value, 3))))  
+
+hemo_ts_plotdf = 
+  hts %>% 
+  filter(id == id[1]) %>% 
+  mutate(val_CVP = if_else(cat_cpb == "intra", NA_real_, val_CVP)) %>% 
+  mutate(time_elaps = as.numeric(difftime(time, min(time),
+                               units = "hours"))) %>% 
+  mutate(
+    group = case_when(
+      range_left(val_MAP, 95, 115) & between(val_CVP, 0, 8) ~ "group_1",
+      (range_left(val_MAP, 75, 95) & between(val_CVP, 0, 8)) | 
+        (range_left(val_MAP, 85, 115) & range_left(val_CVP, 8, 10)) ~ "group_2",
+      (range_left(val_MAP, 55, 75) & between(val_CVP, 0, 8)) | 
+        (range_left(val_MAP, 65, 85) & range_left(val_CVP, 8, 12)) | 
+        (range_left(val_MAP, 85, 115) & range_left(val_CVP, 10, 12)) ~ "group_3",
+      (between(val_MAP, 45, 55) & between(val_CVP, 0, 8)) | 
+        (range_left(val_MAP, 55, 65) & range_left(val_CVP, 8, 12)) | 
+        (range_left(val_MAP, 65, 115) & range_left(val_CVP, 12, 16)) | 
+        (range_left(val_MAP, 85, 115) & range_left(val_CVP, 16, 18)) ~ "group_4",
+      (between(val_MAP, 45, 55) & range_left(val_CVP, 8, 20)) | 
+        (range_left(val_MAP, 55, 65) & range_left(val_CVP, 12, 20)) | 
+        (range_left(val_MAP, 65, 85) & range_left(val_CVP, 16, 20)) | 
+        (range_left(val_MAP, 85, 115) & range_left(val_CVP, 18, 20)) ~ "group_5")) %>% 
+  mutate(danger2 = if_else(group == "group_5" | group == "group_4", 1, 0)) %>% 
+  pivot_longer(cols = c(val_MAP, val_CVP),
+               names_to = "param",
+               values_to = "value") %>% 
+  mutate(danger = case_when(
+    param == "val_CVP" & value < 8 ~ 1,
+    param == "val_CVP" & value > 12 ~ 1,
+    param == "val_MAP" & value < 65 ~ 1,
+    .default = 0
+  )) %>% 
+  mutate(param = factor(param, labels = c("Central Venous Pressure", "Mean Arterial Pressure"))) %>% 
+  mutate(change = danger != danger2 & !is.na(danger2),
+         change = replace_na(change, 0)) 
+
+hts1 = 
+  hts %>% 
+  filter(id == "10148_785999") %>% 
+  mutate(val_CVP = if_else(cat_cpb == "intra", NA_real_, val_CVP)) %>% 
+  mutate(time_elaps = as.numeric(difftime(time, min(time),
+                               units = "hours"))) 
+
+
+df_surv = read_rds(here::here("docs", "data", "temp_los_df.rds"))
+
+aki_id = "14484_377496"
+noaki_id = "75457_952257"
+
+hemo_res = read_rds(here::here("docs", "data", "bricks_regressions.rds")) %>% 
+  filter(type == "adjusted", outcome == "AKI48") %>% 
+  separate_wider_delim(term, delim = "]", names = c("MAP", "CVP", "x")) %>% 
+  mutate(map_fct = factor(MAP, levels = c("MAP[45,55", "MAP(55,65", 
+                                          "MAP(65,75", "MAP(75,85", "MAP(85,95", "MAP(95,105", "MAP(105,115"),
+                          labels = c("[45,55]", "(55,65]", "(65,75]",
+                                     "(75,85]", "(85,95]", "(95,105]",
+                                     "(105,115]")),
+         cvp_fct = factor(CVP, levels = c("CVP[0,2", "CVP(2,4", 
+                                          "CVP(4,6", "CVP(6,8", "CVP(8,10", "CVP(10,12", "CVP(12,14", "CVP(14,16", "CVP(16,18", 
+                                          "CVP(18,20"),
+                          labels = c("[0,2]", "(2,4]", "(4,6]",
+                                     "(6,8]", "(8,10]", "(10,12]",
+                                     "(12,14]", "(14,16]", "(16,18]", "(18,20]")))
+
+
+```
+
+
+## Introduction: accelerometry data 
+
+```{r accel plot}
+#| cache: true
+img_plot = ggplot() +
+  ggimage::geom_image(aes(x = 0.5, y = 0.5, image = here::here("docs/figs/actigraph.png")), size = 1) +
+  theme_void() + 
+  theme(
+      plot.background = element_rect(fill = "#f6f5f3", color = NA),
+      panel.background = element_rect(fill = "#f6f5f3", color = NA)
+    )
+
+
+p1 = 
+  driving %>% 
+  ggplot(aes(x = t, y = vm))+
+  geom_line(linewidth = 0.9, color = "#0072B2")+
+  theme(panel.grid.minor = element_blank()) +
+  labs(x = "Time (s)", y = "Acceleration (g = 9.81m/s²)") +
+  scale_x_continuous(breaks=seq(0,10,1)) +
+  scale_y_continuous(limits = c(0.5, 1.75)) + 
+  annotate(geom = "label", x = 5, y = 1.5, label = "Driving (passenger)", size = 8, color = "#0072B2")
+
+p2 = 
+  cooking %>% 
+  ggplot(aes(x = t, y = vm))+
+  geom_line(linewidth = 0.9, color = "#009E73")+
+  theme(panel.grid.minor = element_blank()) +
+  labs(x = "Time (s)", y = "Acceleration (g = 9.81m/s²)") +
+  scale_x_continuous(breaks=seq(0,10,1)) +
+  scale_y_continuous(limits = c(0.5, 1.75)) +
+  annotate(geom = "label", x = 5, y = 1.5, label = "Cooking", size = 8, color = "#009E73")
+
+
+p3 = 
+  walking %>% 
+  ggplot(aes(x = t, y = vm))+
+  geom_line(linewidth = 0.9, color = "#CC79A7")+
+  theme(panel.grid.minor = element_blank()) +
+  labs(x = "Time (s)", y = "Acceleration (g = 9.81m/s²)") +
+  scale_x_continuous(breaks = seq(0,10,1)) + 
+  scale_y_continuous(limits = c(0.5, 1.75)) +
+  annotate(geom = "label", x = 5, y = 1.5, label = "Walking", size = 8, color = "#CC79A7")
+
+
+
+plot_grid(img_plot, NULL, align = "v", rel_widths = c(1,1), ncol = 2)
+```
+
+::: {.notes}
+I love data. especially big data, collected at high frequency, from wearable devices.
+these data/devices are everywhere: apple watch, oura ring, CGM, heart rate monitor
+have potential to provide rich, detailed information about health and movement in the real world - but processing and analysis pose computational and methodological challenges 
+my work: methods for proc and analyzing these data to extract meaningful scientific insights. my goal is to create new approaches that advance public health research and  statistical science. I am also passionate about creating interpretable visualizations and open source tools/software/data.
+:::
+
+## Introduction: accelerometry data 
+
+```{r accel plot w fig}
+p1a = p1 / p2 / p3 + plot_layout(guides = "collect", axes = "collect")
+
+plot_grid(img_plot, p1a, align = "v", rel_widths = c(1,1), ncol = 2)
+```
+
+::: {.notes}
+In this talk, I'll focus primarily on data from wrist worn accelerometers. 
+Accel has a tiny sensor that collects data on acceleration in 3 dimensions at something b/w 10-100 observations per second. 
+Accel data, at it's core, provides information about human movement - how much, and potentially what type
+Common in consumer devices - for example, accel data used to generate step counts in your iphone or fitbit 
+Research accelerometers are also used in epidemiological studies like NHANES, UK Biobank 
+:::
+
+
+## Introduction: **big** accelerometry data 
+
+```{r accel plot nhanes}
+#| cache: true
+nh_img_plot = ggplot() +
+  ggimage::geom_image(aes(x = 0.5, y = 0.5, image = here::here("docs/figs/nhanes.png")), size = 1) +
+  theme_void() + 
+  theme(
+      plot.background = element_rect(fill = "#f6f5f3", color = NA),
+      panel.background = element_rect(fill = "#f6f5f3", color = NA)
+    )
+
+
+
+p3_annotated = p3 + plot_annotation(
+  caption = "80 observations per second\n× 60 seconds/minute\n× 1440 minutes/day\n× 7 days\n× 15,000 individuals\n=726 billion data points",
+  theme = theme(
+    plot.caption = element_text(
+      hjust = 0.5,            # center the text
+      vjust = 1,              # bring it up a bit
+      size = 14,              # large and clear
+      face = "bold",          # prominent
+      family = "Source Sans Pro",
+      color = "black",        # use a strong color
+      lineheight = 1.1        # control spacing between lines
+    ),
+    plot.background = element_rect(fill = "#f2ede3", color = NA)
+  )
+  )
+
+final_plot = nh_img_plot + 
+  wrap_elements(p3_annotated) + 
+  plot_layout(widths = c(1, 1), heights = c(1))
+
+final_plot
+```
+
+::: {.notes}
+NHANES: ntlly representative study of 5000 Americans per year
+Info on demographics, SES, disease/health history, physical measurements/lab tests, nutrition, and mortality
+With accel: also movement 
+Goal - can understand relationship between health and movement 
+Easier said than done 
+My PhD: asking questions of accelerometry data w/ goal of creating methods to understand relationship between movement and health 
+
+:::
+
+
+## Outline {.question-bullets}
+<div style="font-size: 115%;">
+::: {.incremental}
+
+
+- Can we identify someone from their walking pattern measured by a wrist-worn accelerometer? *(Digital fingerprinting)*
+- Can we identify someone from their walking pattern measured by a wrist-worn accelerometer in big, free-living datasets? 
+- What else can we learn from walking patterns in free-living data? 
+- Can we apply these methods to other high-density data sources? 
+
+:::
+
+</div>
+
+---
+
+
+## Outline {.question-bullets}
+<div style="font-size: 115%;">
+- Can we identify someone from their walking pattern measured by a wrist-worn accelerometer? *(Digital fingerprinting)*
+- <span style="color:gray;">Can we identify someone from their walking pattern measured by a wrist-worn accelerometer in big, free-living datasets?</span>
+- <span style="color:gray;"> What else can we learn from walking patterns in free-living data? </span>
+- <span style="color:gray;">Can we apply these methods to other high-density data sources? </span>
+
+
+</div>
+
+# Can we identify someone from their walking pattern measured by a wrist-worn accelerometer?
+
+---
+
+### Problem setup 
+
+
+```{r accel problem setup}
+#| cache: true
+s1 = data %>% 
+  filter(ID2 %in% c(2, 4, 6, 8, 9)) 
+
+ymax = s1 %>% 
+  filter(ID2 %in% c(2, 4, 6)) %>% 
+  filter(time >= 20 & time < 30) %>% 
+  pull(signal_lw) %>% 
+  max()
+  
+ymin = s1 %>% 
+  filter(ID2 %in% c(2, 4, 6)) %>% 
+  filter(time >= 20 & time < 30) %>% 
+  pull(signal_lw) %>% 
+  min()  
+
+label_df = 
+  s1 %>% 
+  filter(ID2 %in% c(2, 4, 6)) %>% 
+  filter(time >= 20 & time < 30) %>% 
+  mutate(ID2 = factor(ID2, labels = c("Person A", "Person B", "Person C"))) %>% 
+  filter(time == 25) %>% 
+  mutate(signal_lw = 2.5)
+
+p1 =
+  s1 %>% 
+  filter(ID2 %in% c(2, 4, 6)) %>% 
+  filter(time >= 20 & time < 30) %>% 
+  mutate(ID2 = factor(ID2, labels = c("Person A", "Person B", "Person C"))) %>%
+  ggplot(aes(x = time, y = signal_lw, color = ID2)) +
+  geom_line(linewidth = 1) + 
+  facet_wrap(.~ID2, ncol = 1) + 
+  scale_color_manual(values = c("#E69F00", "#56B4E9", "#009E73")) +
+  labs(x = "Time (s)", y = "Acceleration (g)") + 
+  theme(legend.position = "none",
+        panel.spacing = unit(0.1, "lines"), # tighten vertical spacing
+        strip.text = element_blank(),
+        strip.background = element_blank()) +
+  scale_x_continuous(breaks=seq(20, 30, 2), labels= seq(0,10,2)) + 
+  geom_label(data = label_df, aes(color = ID2, label = ID2), size = 8, show.legend = FALSE)
+
+
+label_df2 = 
+  s1 %>% 
+  filter(ID2 %in% c(6, 8, 9)) %>% 
+  filter(time >= 30 & time < 40) %>% 
+  mutate(ID2 = factor(ID2, labels = c("Person ?", "Person ??", "Person ???"))) %>%
+  filter(time == 35) %>% 
+  mutate(signal_lw = 2.5)
+
+
+p2 =
+  s1 %>% 
+  filter(ID2 %in% c(6, 8, 9)) %>% 
+  filter(time >= 30 & time < 40) %>% 
+  mutate(ID2 = factor(ID2, labels = c("Person ?", "Person ??", "Person ???"))) %>%
+  ggplot(aes(x = time, y = signal_lw, color = ID2)) +
+  geom_line(linewidth = 1) + 
+  facet_wrap(.~ID2, ncol = 1) + 
+  scale_color_manual(values = c("#D55E00","#CC79A7", "#000000")) +
+  labs(x = "Time (s)", y = "Acceleration (g)") + 
+  theme(legend.position = "none",
+        panel.spacing = unit(0.1, "lines"), # tighten vertical spacing
+        strip.text = element_blank(),
+        strip.background = element_blank()) +
+  scale_x_continuous(breaks=seq(30, 40, 2), labels= seq(0,10,2)) + 
+  scale_y_continuous(limits=c(ymin, ymax)) +
+  geom_label(data = label_df2, aes(color = ID2), label = "?", size = 8, show.legend = FALSE)
+
+
+label_df3 = 
+  s1 %>% 
+  filter(ID2 %in% c(6, 8, 9)) %>% 
+  filter(time >= 30 & time < 40) %>% 
+  mutate(ID2 = factor(ID2, labels = c("Person C", "Person D", "Person E"))) %>%
+  filter(time == 35) %>% 
+  mutate(signal_lw = 2.5)
+
+p3 =
+  s1 %>% 
+  filter(ID2 %in% c(6, 8, 9)) %>% 
+  filter(time >= 30 & time < 40) %>% 
+  mutate(ID2 = factor(ID2, labels = c("Person C", "Person D", "Person E"))) %>%
+  ggplot(aes(x = time, y = signal_lw, color = ID2)) +
+  geom_line(linewidth = 1) + 
+  facet_wrap(.~ID2, ncol = 1) + 
+  scale_color_manual(values = c("#009E73","#CC79A7", "#000000")) +
+  labs(x = "Time (s)", y = "Acceleration (g)") + 
+  theme(legend.position = "none",
+        panel.spacing = unit(0.1, "lines"), # tighten vertical spacing
+        strip.text = element_blank(),
+        strip.background = element_blank()) +
+  scale_x_continuous(breaks=seq(30, 40, 2), labels= seq(0,10,2)) + 
+  scale_y_continuous(limits=c(ymin, ymax)) +
+  geom_label(data = label_df3, aes(color = ID2, label = ID2), size = 8, show.legend = FALSE)
+
+p_empty =
+  s1 %>% 
+  filter(ID2 %in% c(6, 8, 9)) %>% 
+  filter(time >= 30 & time < 40) %>% 
+  mutate(ID2 = factor(ID2, labels = c("Person C", "Person D", "Person E"))) %>%
+  ggplot(aes(x = time, y = signal_lw, color = ID2)) +
+  scale_x_continuous(breaks=seq(30, 40, 2), labels= seq(0,10,2)) + 
+  theme_void() +
+  theme(panel.background = element_rect(fill = "#f6f5f3", color = NA),
+        plot.background = element_rect(fill = "#f6f5f3", color = NA))
+
+
+
+# p1 + p_empty + plot_layout(widths = c(1, 1))
+plot_grid(p1, p_empty, ncol = 2, align = "v", rel_widths = c(1,1))
+
+```
+
+::: {.notes}
+Why do we care about this? interesting, biometric, might say something about health status, change in it could predict change in health. 
+
+
+Let's make this more concrete....
+
+::: 
+
+---
+
+### Problem setup 
+
+```{r fingerprint question 2}
+#| cache: true
+# p1 + p2 + plot_layout(widths = c(1, 1))
+
+plot_grid(p1, p2, ncol = 2, align = "v", rel_widths = c(1,1))
+
+```
+
+::: {.notes}
+Engage audience 
+:::
+
+---
+
+### Problem setup 
+
+```{r fingerprint answer}
+plot_grid(p1, p3, ncol = 2, align = "v", rel_widths = c(1,1))
+```
+
+
+---
+
+### Big picture method: time series to scalar predictors
+
+```{r def arrow}
+arrow_plot = ggplot() +
+  xlim(0,1) + ylim(0,1) +
+  annotate(
+    "segment",
+    x = 0, xend = 1, y = 0.5, yend = 0.5,
+    arrow = arrow(length = unit(0.2, "inches"), type = "closed"),
+    color = "#D55E00", linewidth = 1.5
+  ) +
+  theme_void() +
+  theme(plot.background = element_rect(fill = "#f6f5f3"))
+```
+
+```{r x matrix}
+#| cache: true
+n_rows = 15
+n_cols = 10
+
+# Create a dummy data frame for tiles
+pred_matrix = expand_grid(
+  row = 1:n_rows,
+  col = 1:n_cols
+) %>% 
+  mutate(subj = 
+           case_when(row %in% c(1:5) ~ 1,
+                     row %in% c(6:10) ~ 2,
+                     TRUE ~ 3)) %>% 
+  rowwise() %>% 
+  mutate(alpha = runif(1, 0, 1)) %>% 
+  ungroup()
+
+
+# Bracket offsets
+vert_extend = 1.0   # how far the vertical line extends beyond top/bottom
+hor_arm = 0.4       # horizontal arm length
+
+# Left bracket `[`
+left_bracket = tibble(
+  # vertical line
+  x = 0.5 - 0.3, xend = 0.5 - 0.3,
+  y = 0.5 - vert_extend, yend = n_rows + 0.5 + vert_extend,
+  # top horizontal
+  x_top = 0.5 - 0.3, xend_top = 0.5 - 0.3 + hor_arm,
+  y_top = n_rows + 0.5 + vert_extend, yend_top = n_rows + 0.5 + vert_extend,
+  # bottom horizontal
+  x_bottom = 0.5 - 0.3, xend_bottom = 0.5 - 0.3 + hor_arm,
+  y_bottom = 0.5 - vert_extend, yend_bottom = 0.5 - vert_extend
+)
+
+# Right bracket `]`
+right_bracket = tibble(
+  # vertical line
+  x = n_cols + 0.5 + 0.3, xend = n_cols + 0.5 + 0.3,
+  y = 0.5 - vert_extend, yend = n_rows + 0.5 + vert_extend,
+  # top horizontal
+  x_top = n_cols + 0.5 + 0.3, xend_top = n_cols + 0.5 + 0.3 - hor_arm,
+  y_top = n_rows + 0.5 + vert_extend, yend_top = n_rows + 0.5 + vert_extend,
+  # bottom horizontal
+  x_bottom = n_cols + 0.5 + 0.3, xend_bottom = n_cols + 0.5 + 0.3 - hor_arm,
+  y_bottom = 0.5 - vert_extend, yend_bottom = 0.5 - vert_extend
+)
+
+# Plot
+p2 = ggplot(pred_matrix, aes(x = col, y = row, fill = factor(subj), alpha = alpha)) + 
+  geom_tile(color = "grey70", size = 0.5) +
+  # Left bracket
+  geom_segment(data = left_bracket, aes(x = x, xend = xend, y = y, yend = yend), inherit.aes = FALSE, size = 1) +
+  geom_segment(data = left_bracket, aes(x = x_top, xend = xend_top, y = y_top, yend = yend_top), inherit.aes = FALSE, size = 1) +
+  geom_segment(data = left_bracket, aes(x = x_bottom, xend = xend_bottom, y = y_bottom, yend = yend_bottom), inherit.aes = FALSE, size = 1) +
+  # Right bracket
+  geom_segment(data = right_bracket, aes(x = x, xend = xend, y = y, yend = yend), inherit.aes = FALSE, size = 1) +
+  geom_segment(data = right_bracket, aes(x = x_top, xend = xend_top, y = y_top, yend = yend_top), inherit.aes = FALSE, size = 1) +
+  geom_segment(data = right_bracket, aes(x = x_bottom, xend = xend_bottom, y = y_bottom, yend = yend_bottom), inherit.aes = FALSE, size = 1) +
+  theme_minimal(base_family = "Source Sans Pro") +
+  theme(
+    axis.title = element_blank(),
+    axis.text = element_blank(),
+    axis.ticks = element_blank(),
+    panel.grid = element_blank(),
+    plot.background = element_rect(fill = "#f6f5f3", color = NA),
+    plot.title = element_text(size = 36, face = "bold", hjust = 0.5)
+  ) +
+  # labs(title = "X") +
+  theme(legend.position = "none") + 
+  scale_fill_manual(values = c("#E69F00", "#56B4E9", "#009E73")) +
+  scale_y_reverse()
+
+p2  = 
+  p2 + 
+  annotate(geom = "label", x = 5.5, y = 2.5, label = "Predictors from person A", color = "#E69F00", size = 8)  +
+  annotate(geom = "label", x = 5.5, y = 7.5, label = "Predictors from person B", color = "#56B4E9", size = 8) +
+  annotate(geom = "label", x = 5.5, y = 12.5, label = "Predictors from person C", color = "#009E73", size = 8) 
+
+p2a = arrow_plot + p2 + plot_layout(widths = c(0.1, 0.9))
+```
+
+```{r print arrow x }
+# p1 + p2a + plot_layout(widths = c(1, 1))
+
+plot_grid(p1, p2a, ncol = 2, align = "v", rel_widths = c(1,1))
+
+```
+
+
+---
+
+
+
+### Details of the method
+
+::: {.incremental}
+**For each second and each person**: 
+<div style="font-size: 150%;">
+
+
++ Obtain joint distribution of acceleration and lag acceleration for a series of lags (image) 
+
++ Calculate scalar summaries of the joint distribution 
+  
++ Time series $\rightarrow$ complex object (image) $\rightarrow$ scalar predictors 
+
++ Intuition: walking is cyclic process, we want to leverage dynamics of this process
+
++ We will walk through process for one second and one lag 
+</div>
+
+::: 
+
+::: {.notes}
+This has been done before, mostly with video data
+Existing accelerometry approaches require segmentation of step -error prone, computationally intensive
+Tried Fourier transform, summaries of time series (mean, SD, higher order moments), didn't work 
+This approach: take time series, make more complex, use summaries of complex thing 
+:::
+
+
+--- 
+
+### Obtain joint distribution of acceleration and lag acceleration 
+
+```{r jdist accel only}
+#| cache: true
+p = df %>% 
+  ggplot() +
+  geom_line(aes(x = time, y = vm), 
+    linewidth = .9) +
+  geom_point(aes(x = time, y = vm), color = "black") +
+  labs(x = "Time (s)", y = "Acceleration (g)") +
+  theme(
+    legend.position = c(0.2, 0.9),
+    legend.title = element_blank(),
+    panel.grid = element_blank(),
+    legend.background = element_rect(fill = "#f6f5f3", color = "#f6f5f3")
+  ) +
+  guides(color = guide_legend(nrow = 1)) +
+  scale_x_continuous(breaks=c(seq(0, 1, 0.15), 1))
+
+plot_grid(p, p_empty, ncol = 1, align = "h", rel_heights = c(1,1))
+
+```
+
+---
+
+### Obtain joint distribution of acceleration and lag acceleration 
+
+```{r jdistorig}
+#| cache: true
+p = ggplot() +
+  geom_line(
+    data = df %>% pivot_longer(
+      cols = c(vm, lag_vm),
+      names_to = "variable",
+      values_to = "value"
+    ) %>%
+      mutate(variable = factor(variable, levels = c("vm", "lag_vm"))),
+    aes(
+      x = time,
+      y = value,
+      color = variable
+    ),
+    linewidth = .9
+  ) +
+  geom_point(
+    data = df %>% pivot_longer(
+      cols = c(vm, lag_vm),
+      names_to = "variable",
+      values_to = "value"
+    ) %>%
+      mutate(variable = factor(variable, levels = c("vm", "lag_vm"))),
+    aes(x = time, y = value, color = variable)
+  ) +
+  scale_color_manual(
+    values = c("black", "darkgrey"),
+    labels = c("Acceleration", "0.15s lagged acceleration"),
+    name = ""
+  ) +
+  labs(x = "Time (s)", y = "Acceleration (g)") +
+  theme(
+    legend.position = c(0.2, 0.9),
+    legend.title = element_blank(),
+    panel.grid = element_blank(),
+    legend.background = element_rect(fill = "#f6f5f3", color = "#f6f5f3")
+  ) +
+  guides(color = guide_legend(nrow = 1)) +
+  scale_x_continuous(breaks=c(seq(0, 1, 0.15), 1))
+
+plot_grid(p, p_empty, ncol = 1, align = "h", rel_heights = c(1,1))
+
+```
+
+---
+
+### Obtain joint distribution of acceleration and lag acceleration 
+
+
+```{r joint dist 1pt}
+#| cache: true
+points = df %>% 
+  pivot_longer(
+    cols = c(vm, lag_vm),
+    names_to = "variable",
+    values_to = "value") %>% 
+  select(time, value, variable) %>% filter(round(time, 2) == .150)
+p = ggplot() +
+  geom_line(
+    data = df %>% pivot_longer(
+      cols = c(vm, lag_vm),
+      names_to = "variable",
+      values_to = "value"
+    ) %>%
+      mutate(variable = factor(variable, levels = c("vm", "lag_vm"))),
+    aes(
+      x = time,
+      y = value,
+      color = variable
+    ),
+    linewidth = .9
+  ) +
+  geom_point(
+    data = df %>% pivot_longer(
+      cols = c(vm, lag_vm),
+      names_to = "variable",
+      values_to = "value"
+    ) %>%
+      mutate(variable = factor(variable, levels = c("vm", "lag_vm"))),
+    aes(x = time, y = value, color = variable)
+  ) +
+  scale_color_manual(
+    values = c("black", "darkgrey"),
+    labels = c("Acceleration", "0.15s lagged acceleration"),
+    name = ""
+  ) +
+  labs(x = "Time (s)", y = "Acceleration (g)") +
+  theme(
+    legend.position = c(0.2, 0.9),
+    legend.title = element_blank(),
+    panel.grid = element_blank(),
+    legend.background = element_rect(fill = "#f6f5f3", color = "#f6f5f3")
+  ) +
+  guides(color = guide_legend(nrow = 1)) +
+  annotate(
+    geom = "point",
+    x = points$time[1],
+    y = points$value[1],
+    color =  "#56B4E9",
+    size = 3.5
+  ) +
+  annotate(
+    geom = "point",
+    x = points$time[2],
+    y = points$value[2],
+    color = "#56B4E9",
+    size = 3.5
+  ) +
+  scale_x_continuous(breaks=c(seq(0, 1, 0.15), 1))
+
+p1 = df %>%
+  filter(!is.na(lag_vm)) %>%
+  slice(1) %>%
+  ggplot(aes(x = vm, y = lag_vm)) +
+  geom_point(aes(group = time), size = 3.5, color = "#56B4E9") +
+  annotate(geom = "label", x = points$value[1], y = points$value[2],
+           label = "First acceleration,\nlag acceleration pair",
+           vjust = 1, hjust = -.1, size = 3) +
+  scale_x_continuous(limits = c(0.4, 2.6)) +
+  scale_y_continuous(limits = c(0.4, 2.6)) +
+  labs(x = "Acceleration (g)", y = "Lagged acceleration (g)") +
+  theme(panel.grid = element_blank())
+
+plot_grid(p, p1, ncol = 1, align = "h", rel_heights = c(1,1))
+
+```
+
+
+
+---
+
+### Obtain joint distribution of acceleration and lag acceleration 
+
+
+```{r joint dist pts}
+#| cache: true
+points = df %>% 
+  pivot_longer(
+    cols = c(vm, lag_vm),
+    names_to = "variable",
+    values_to = "value") %>% 
+  select(time, value, variable) %>% 
+  filter(round(time, 2) == .150 | round(time, 2) == .160)
+p = ggplot() +
+  geom_line(
+    data = df %>% pivot_longer(
+      cols = c(vm, lag_vm),
+      names_to = "variable",
+      values_to = "value"
+    ) %>%
+      mutate(variable = factor(variable, levels = c("vm", "lag_vm"))),
+    aes(
+      x = time,
+      y = value,
+      color = variable
+    ),
+    linewidth = .9
+  ) +
+  geom_point(
+    data = df %>% pivot_longer(
+      cols = c(vm, lag_vm),
+      names_to = "variable",
+      values_to = "value"
+    ) %>%
+      mutate(variable = factor(variable, levels = c("vm", "lag_vm"))),
+    aes(x = time, y = value, color = variable)
+  ) +
+  scale_color_manual(
+    values = c("black", "darkgrey"),
+    labels = c("Acceleration", "0.15s lagged acceleration"),
+    name = ""
+  ) +
+  labs(x = "Time (s)", y = "Acceleration (g)") +
+  theme(
+    legend.position = c(0.2, 0.9),
+    legend.title = element_blank(),
+    panel.grid = element_blank(),
+    legend.background = element_rect(fill = "#f6f5f3", color = "#f6f5f3")
+  ) +
+  scale_x_continuous(breaks=c(seq(0, 1, 0.15), 1)) +
+  guides(color = guide_legend(nrow = 1)) +
+  annotate(
+    geom = "point",
+    x = points$time[1],
+    y = points$value[1],
+    color = "#56B4E9",
+    size = 3.5
+  ) +
+  annotate(
+    geom = "point",
+    x = points$time[2],
+    y = points$value[2],
+    color = "#56B4E9",
+    size = 3.5
+  ) +
+  annotate(
+    geom = "point",
+    x = points$time[3],
+    y = points$value[3],
+    color = "#D55E00",
+    size = 3.5
+  ) +
+  annotate(
+    geom = "point",
+    x = points$time[4],
+    y = points$value[4],
+    color = "#D55E00",
+    size = 3.5
+  )
+
+p1 = df %>%
+  ggplot(aes(x = vm, y = lag_vm)) +
+  annotate(geom = "point", x = 0.622, y = 1.26, size = 3.5, color = "#56B4E9") +
+  annotate(geom = "point", x = 0.613, y = 1.19, size = 3.5, color = "#D55E00") +
+  annotate(geom = "label", x = points$value[3], y = points$value[4],
+           label = "Second acceleration,\nlag acceleration pair",
+           vjust = 1, hjust = -.1, size = 3) +
+  scale_x_continuous(limits = c(0.4, 2.6)) +
+  scale_y_continuous(limits = c(0.4, 2.6)) +
+  labs(x = "Acceleration (g)", y = "Lagged acceleration (g)") +
+  theme(panel.grid = element_blank())
+plot_grid(p, p1, ncol = 1, align = "h", rel_heights = c(1,1))
+
+```
+
+---
+
+### Obtain joint distribution of acceleration and lag acceleration 
+
+
+```{r joint dist 00}
+#| cache: true
+blue_pts = 
+  df %>%
+  filter(!is.na(lag_vm)) %>%
+  slice(1)
+
+or_pts = 
+  df %>%
+  filter(!is.na(lag_vm)) %>%
+  slice(2)
+
+p1 = df %>%
+  filter(!is.na(lag_vm)) %>%
+  ggplot(aes(x = vm, y = lag_vm)) +
+  geom_point(color = "#383838") + 
+  geom_point(data = blue_pts, aes(group = time), color = "#56B4E9", size = 3.5) +
+  geom_point(data = or_pts, aes(group = time), color = "#D55E00", size = 3.5) +
+  scale_x_continuous(limits = c(0.4, 2.6)) +
+  scale_y_continuous(limits = c(0.4, 2.6)) +
+  labs(x = "Acceleration (g)", y = "Lagged acceleration (g)") +
+  theme(panel.grid = element_blank()) +
+  annotate(geom = "label", x = 1.5, y = 2,
+           label = "All acceleration,\nlag acceleration pairs",
+           vjust = 1, hjust = -.1, size = 3) 
+
+plot_grid(p, p1, ncol = 1, align = "h", rel_heights = c(1,1))
+
+```
+
+
+---
+
+### Obtain joint distribution of acceleration and lag acceleration 
+
+
+<img src="figs/p1a_v2.gif" class="gif-stack">
+<img src="figs/p2a.gif" class="gif-stack">
+
+---
+
+### Derive predictors from joint distribution 
+
+```{r joint dist 0}
+#| cache: true
+extra = 
+  expand_grid(
+    vm = seq(0, 3, 0.1), 
+    lag_vm = seq(0, 3, 0.1)) %>%
+  mutate(
+    vm = cut(vm, breaks = seq(0, 3, 0.25), include.lowest = TRUE),
+    lag_vm = cut(lag_vm, breaks = seq(0, 3, 0.25), include.lowest = TRUE),
+    n = 0, 
+    grp = paste0(vm, "_", lag_vm))
+         
+count_df = 
+  df %>%
+  drop_na() %>% 
+  mutate(vm = cut(vm, breaks=seq(0, 3, 0.25), include.lowest = TRUE),
+         lag_vm = cut(lag_vm, breaks = seq(0, 3, 0.25), include.lowest = TRUE)) %>% 
+  group_by(vm, lag_vm) %>% 
+  count() %>% 
+  mutate(grp =paste0(vm, "_", lag_vm))
+
+plot_df = 
+  count_df %>% 
+  bind_rows(extra %>% filter(!(grp %in% count_df$grp))) 
+  
+plot_df2 = plot_df %>% rename(cat_vm = vm, cat_lag_vm = lag_vm) %>% 
+  mutate(xmin = sub(".*\\((.+)\\,.*", "\\1", cat_vm),
+         xmax = sub(".*\\,(.+)\\].*", "\\1", cat_vm),
+         ymin = sub(".*\\((.+)\\,.*", "\\1", cat_lag_vm),
+         ymax = sub(".*\\,(.+)\\].*", "\\1", cat_lag_vm)) %>% 
+  mutate(across(contains("min") | contains("max"), as.numeric)) %>% 
+  mutate(xmin = if_else(is.na(xmin), 0, xmin),
+         ymin = if_else(is.na(ymin), 0, ymin))
+         
+
+df %>%
+  ggplot() +
+  geom_point(aes(x = vm, y = lag_vm), size = 1.5) +
+  scale_x_continuous(limits = c(0, 3), breaks = seq(0, 3, 0.25)) +
+  scale_y_continuous(limits = c(0, 3), breaks = seq(0, 3, 0.25)) +
+  labs(x = "Acceleration (g)", y = "Lagged acceleration (g)") +
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major = element_blank()) + 
+  geom_rect(data = plot_df2, aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), color = "darkgrey", fill = "transparent")
+  
+```
+
+---
+
+### Derive predictors from joint distribution 
+
+```{r jointdist0}
+#| cache: true
+
+
+df %>%
+  ggplot() +
+  annotate(geom = "rect", 
+           xmin = 0.75, xmax = 1, ymin = 1.5, ymax = 1.75, 
+           col = NA, fill = "#F0E442") +
+  annotate(geom = "text", x = .86, y = 1.69, label = "n=2", size = 3) +
+  geom_point(aes(x = vm, y = lag_vm), size = 1.5) + 
+  scale_x_continuous(limits = c(0, 3), breaks = seq(0, 3, 0.25)) +
+  scale_y_continuous(limits = c(0, 3), breaks = seq(0, 3, 0.25)) +
+  labs(x = "Acceleration (g)", y = "Lagged acceleration (g)") +
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major = element_blank()) + 
+  geom_rect(data = plot_df2, aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), color = "darkgrey", fill = "transparent") 
+```
+
+---
+
+### Derive predictors from joint distribution 
+
+
+```{r jointdist}
+#| cache: true
+df %>%
+  ggplot() +
+  annotate(geom = "rect", 
+           xmin = 0.75, xmax = 1.25, ymin = 1.5, ymax = 1.75,
+           col = NA, fill = "#F0E442") +
+  annotate(geom = "text", x = .86, y = 1.69, label = "n=2", size = 3) +
+  annotate(geom = "text", x = 1.1, y = 1.6, label = "n=3", size = 3)  +
+  geom_point(aes(x = vm, y = lag_vm), size = 1.5) + 
+  scale_x_continuous(limits = c(0, 3), breaks = seq(0, 3, 0.25)) +
+  scale_y_continuous(limits = c(0, 3), breaks = seq(0, 3, 0.25)) +
+  labs(x = "Acceleration (g)", y = "Lagged acceleration (g)") +
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major = element_blank()) + 
+  geom_rect(data = plot_df2, aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), color = "darkgrey", fill = "transparent") 
+
+```
+
+::: {.notes}
+Derive predictors from joint distribution by binning space into cells, and summing observations in cell - essentially a fancy histogram, where the bins of our histogram are these cells
+Vectorize, put into predictor matrix 
+3 lags x 144 cells = 432 columns in matrix
+
+:::
+
+
+---
+
+### Derive predictors from joint distribution 
+
+
+```{r joint dist}
+#| cache: true
+p = df %>%
+  mutate(cat_vm = cut(vm, breaks=seq(0, 3, 0.25), include.lowest = TRUE),
+         cat_lag_vm = cut(lag_vm, breaks = seq(0, 3, 0.25), include.lowest = TRUE)) %>% 
+  ggplot() +
+  geom_rect(data = plot_df2, aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax,
+                                 fill = n), color = "darkgrey") +
+  labs(x = "Acceleration (g)", y = "Lagged acceleration (g)") + 
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        legend.position = "none") + 
+  scale_x_continuous(limits = c(0, 3), breaks = seq(0, 3, 0.25)) +
+  scale_y_continuous(limits = c(0, 3), breaks = seq(0, 3, 0.25)) +
+  scale_fill_viridis(limits = c(0.0001, 19), option = "B") + 
+  geom_text(data = plot_df2 %>% filter(n > 0) %>% 
+              mutate(tcol = if_else(n >= 11, 0, 1)), 
+              aes(color = factor(tcol), x = xmin + 0.125, y = ymin + 0.125, label = n), size = 5) +
+  scale_color_manual(values = c("black", "white")) +
+  geom_point(aes(x = vm, y = lag_vm), color = "#f6f5f3", alpha = 0.5)
+
+p_nopts = 
+  df %>%
+  mutate(cat_vm = cut(vm, breaks=seq(0, 3, 0.25), include.lowest = TRUE),
+         cat_lag_vm = cut(lag_vm, breaks = seq(0, 3, 0.25), include.lowest = TRUE)) %>% 
+  ggplot() +
+  geom_point(aes(x = vm, y = lag_vm), color = "#f6f5f3", alpha = 0.5) +
+  geom_rect(data = plot_df2, aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax,
+                                 fill = n), color = "darkgrey") +
+  labs(x = "Acceleration (g)", y = "Lagged acceleration (g)") + 
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        # axis.text.y  = element_text(margin = margin(l = -20, unit = "pt")),
+        legend.position = "none") + 
+  scale_x_continuous(limits = c(0, 3), breaks = seq(0, 3, 0.25)) +
+  scale_y_continuous(limits = c(0, 3), breaks = seq(0, 3, 0.25)) +
+  scale_fill_viridis(limits = c(0.0001, 19), option = "B") + 
+  geom_text(data = plot_df2 %>% filter(n > 0) %>% 
+              mutate(tcol = if_else(n >= 11, 0, 1)), 
+              aes(color = factor(tcol), x = xmin + 0.125, y = ymin + 0.125, label = n), size = 5) +
+  scale_color_manual(values = c("black", "white")) 
+
+p
+
+
+```
+
+---
+
+### Derive predictors from joint distribution 
+
+
+```{r grid to matrix}
+#| cache: true
+n_rows = 10
+n_cols = 29
+counts = c(0, 0, 4, 11, 7, 6, 0, 0, 2, 2, 0, 0, 7, 0, 2, 9, 2, 11, 0, 1, 2, 2, 3, 7, 0, 2,5,0,0)
+# Create a dummy data frame for tiles
+pred_matrix = expand_grid(
+  row = 1:n_rows,
+  col = 1:n_cols
+)  %>% 
+  mutate(n = c(counts, rep(Inf, (n_rows * n_cols) - n_cols)))
+
+# Bracket offsets
+vert_extend = 1.0   # how far the vertical line extends beyond top/bottom
+hor_arm = 0.4       # horizontal arm length
+
+# Left bracket `[`
+left_bracket = tibble(
+  # vertical line
+  x = 0.5 - 0.3, xend = 0.5 - 0.3,
+  y = 0.5 - vert_extend, yend = n_rows + 0.5 + vert_extend,
+  # top horizontal
+  x_top = 0.5 - 0.3, xend_top = 0.5 - 0.3 + hor_arm,
+  y_top = n_rows + 0.5 + vert_extend, yend_top = n_rows + 0.5 + vert_extend,
+  # bottom horizontal
+  x_bottom = 0.5 - 0.3, xend_bottom = 0.5 - 0.3 + hor_arm,
+  y_bottom = 0.5 - vert_extend, yend_bottom = 0.5 - vert_extend
+)
+
+# Right bracket `]`
+right_bracket = tibble(
+  # vertical line
+  x = n_cols + 0.5 + 0.3, xend = n_cols + 0.5 + 0.3,
+  y = 0.5 - vert_extend, yend = n_rows + 0.5 + vert_extend,
+  # top horizontal
+  x_top = n_cols + 0.5 + 0.3, xend_top = n_cols + 0.5 + 0.3 - hor_arm,
+  y_top = n_rows + 0.5 + vert_extend, yend_top = n_rows + 0.5 + vert_extend,
+  # bottom horizontal
+  x_bottom = n_cols + 0.5 + 0.3, xend_bottom = n_cols + 0.5 + 0.3 - hor_arm,
+  y_bottom = 0.5 - vert_extend, yend_bottom = 0.5 - vert_extend
+)
+
+pred_matrix$z_plot = ifelse(is.infinite(pred_matrix$n), max(pred_matrix$n[is.finite(pred_matrix$n)], na.rm = TRUE), pred_matrix$n)
+
+
+# Plot
+p2 = ggplot(pred_matrix, aes(x = col, y = row, fill = z_plot)) + 
+  geom_tile(color = "#f6f5f3", linewidth = 0.5, size = .5) +
+  # Left bracket
+  geom_segment(data = left_bracket, aes(x = x, xend = xend, y = y, yend = yend), inherit.aes = FALSE, size = 1) +
+  geom_segment(data = left_bracket, aes(x = x_top, xend = xend_top, y = y_top, yend = yend_top), inherit.aes = FALSE, size = 1) +
+  geom_segment(data = left_bracket, aes(x = x_bottom, xend = xend_bottom, y = y_bottom, yend = yend_bottom), inherit.aes = FALSE, size = 1) +
+  # Right bracket
+  geom_segment(data = right_bracket, aes(x = x, xend = xend, y = y, yend = yend), inherit.aes = FALSE, size = 1) +
+  geom_segment(data = right_bracket, aes(x = x_top, xend = xend_top, y = y_top, yend = yend_top), inherit.aes = FALSE, size = 1) +
+  geom_segment(data = right_bracket, aes(x = x_bottom, xend = xend_bottom, y = y_bottom, yend = yend_bottom), inherit.aes = FALSE, size = 1) +
+  scale_fill_viridis(option = "B", limits = c(0.0001, 19)) +
+  theme_minimal(base_family = "Source Sans Pro") +
+  theme(
+    axis.title = element_blank(),
+    axis.text = element_blank(),
+    axis.ticks = element_blank(),
+    panel.grid = element_blank(),
+    plot.background = element_rect(fill = "#f6f5f3", color = NA),
+    plot.title = element_text(size = 36, face = "bold", hjust = 0.5)
+  ) +
+  theme(legend.position = "none") + 
+  scale_y_reverse() +
+  geom_tile(data = subset(pred_matrix, is.infinite(n)), fill = "#f6f5f3")
+```
+
+```{r ap}
+arrow_plot = ggplot() +
+  xlim(0,1) + ylim(0,.5) +
+  annotate(
+    "segment",
+    y = .5, yend = 0, x = 0.5, xend = 0.5,
+    arrow = arrow(length = unit(0.1, "inches"), type = "closed"),
+    color = "#D55E00", size = 1
+  ) +
+  theme_void()+
+  theme(plot.background = element_rect(fill = "#f6f5f3"))
+```
+
+```{r ap2}
+p_nopts  / arrow_plot  / p2 + plot_layout(ncol = 1, heights = c(1, 0.2, 1))
+
+```
+
+---
+
+### Repeat for multiple lags
+
+```{r repeat mult lags}
+#| cache: true
+# this will be two panel plot with second 1 and second 2 on top 
+count_dfl2 = 
+  df30 %>%
+  drop_na() %>% 
+  mutate(vm = cut(vm, breaks=seq(0, 3, 0.25), include.lowest = TRUE),
+         lag_vm = cut(lag_vm, breaks = seq(0, 3, 0.25), include.lowest = TRUE)) %>% 
+  group_by(vm, lag_vm) %>% 
+  count() %>% 
+  mutate(grp =paste0(vm, "_", lag_vm))
+
+plot_dfl2 = 
+  count_dfl2 %>% 
+  bind_rows(extra %>% filter(!(grp %in% count_dfl2$grp))) 
+  
+combo_df = plot_df %>% mutate(lag = "Lag = 0.15s") %>% 
+  bind_rows(plot_dfl2 %>% mutate(lag = "Lag = 0.30s")) 
+pv2l = combo_df %>% 
+  ggplot(aes(x = vm, y = lag_vm, label = n)) + 
+  geom_tile(col = "darkgrey", aes(fill = n)) + 
+  scale_fill_viridis(limits = c(0.0001, 19), option = "B") + 
+  facet_grid(.~lag) + 
+  geom_text(data = combo_df %>% filter(n > 0) %>% 
+              mutate(tcol = if_else(n >= 11, 0, 1)), 
+              aes(color = factor(tcol))) +
+  scale_color_manual(values = c("black", "white")) +
+  theme(legend.position = "none",
+        axis.text = element_blank(),
+        plot.title = element_text(size = 12, face = "plain")) + 
+  labs(x = "Acceleration (g)", y = "Lagged acceleration (g)") 
+
+pv2la = combo_df %>% 
+  ggplot(aes(x = vm, y = lag_vm, label = n)) + 
+  geom_tile(col = "black", aes(fill = n)) + 
+  scale_fill_viridis(limits = c(0.0001, 19), option = "B") + 
+  facet_grid(.~lag) + 
+  theme(legend.position = "none",
+        axis.text = element_blank(),
+        plot.title = element_text(size = 12, face = "plain")) + 
+  labs(x = "Acceleration (g)", y = "Lagged acceleration (g)", title = "Second 1") 
+```
+
+```{r mult lags pred mat}
+#| cache: true
+n_rows = 10
+n_cols = 29 * 2 
+counts = c(0, 6, 7, 11, 4, 0, 0, 7, 0, 2, 2, 0, 11, 2, 9, 0, 3, 0, 7, 3, 2, 2, 1,
+           0, 5, 2, 0, 0, 0,
+           0, 0, 6, 4, 6, 0, 0, 3, 5, 0, 0, 0, 14, 2, 5, 4, 0, 0, 10, 4, 1, 0, 0, 6, 1, 0, 0, 0, 0)
+  
+ 
+# Create a dummy data frame for tiles
+pred_matrix = expand_grid(
+  row = 1:n_rows,
+  col = 1:n_cols
+)  %>% 
+  mutate(n = c(counts, rep(Inf, (n_rows * n_cols) - (n_cols))))
+
+# Bracket offsets
+vert_extend = 1.0   # how far the vertical line extends beyond top/bottom
+hor_arm = 0.4       # horizontal arm length
+
+# Left bracket `[`
+left_bracket = tibble(
+  # vertical line
+  x = 0.5 - 0.3, xend = 0.5 - 0.3,
+  y = 0.5 - vert_extend, yend = n_rows + 0.5 + vert_extend,
+  # top horizontal
+  x_top = 0.5 - 0.3, xend_top = 0.5 - 0.3 + hor_arm,
+  y_top = n_rows + 0.5 + vert_extend, yend_top = n_rows + 0.5 + vert_extend,
+  # bottom horizontal
+  x_bottom = 0.5 - 0.3, xend_bottom = 0.5 - 0.3 + hor_arm,
+  y_bottom = 0.5 - vert_extend, yend_bottom = 0.5 - vert_extend
+)
+
+# Right bracket `]`
+right_bracket = tibble(
+  # vertical line
+  x = n_cols + 0.5 + 0.3, xend = n_cols + 0.5 + 0.3,
+  y = 0.5 - vert_extend, yend = n_rows + 0.5 + vert_extend,
+  # top horizontal
+  x_top = n_cols + 0.5 + 0.3, xend_top = n_cols + 0.5 + 0.3 - hor_arm,
+  y_top = n_rows + 0.5 + vert_extend, yend_top = n_rows + 0.5 + vert_extend,
+  # bottom horizontal
+  x_bottom = n_cols + 0.5 + 0.3, xend_bottom = n_cols + 0.5 + 0.3 - hor_arm,
+  y_bottom = 0.5 - vert_extend, yend_bottom = 0.5 - vert_extend
+)
+
+pred_matrix$z_plot = ifelse(is.infinite(pred_matrix$n), max(pred_matrix$n[is.finite(pred_matrix$n)], na.rm = TRUE), pred_matrix$n)
+
+
+# Plot
+p2 = ggplot(pred_matrix, aes(x = col, y = row, fill = z_plot)) + 
+  geom_tile(color = "#f6f5f3", linewidth = 0.5, size = .5) +
+  # Left bracket
+  geom_segment(data = left_bracket, aes(x = x, xend = xend, y = y, yend = yend), inherit.aes = FALSE, size = 1) +
+  geom_segment(data = left_bracket, aes(x = x_top, xend = xend_top, y = y_top, yend = yend_top), inherit.aes = FALSE, size = 1) +
+  geom_segment(data = left_bracket, aes(x = x_bottom, xend = xend_bottom, y = y_bottom, yend = yend_bottom), inherit.aes = FALSE, size = 1) +
+  # Right bracket
+  geom_segment(data = right_bracket, aes(x = x, xend = xend, y = y, yend = yend), inherit.aes = FALSE, size = 1) +
+  geom_segment(data = right_bracket, aes(x = x_top, xend = xend_top, y = y_top, yend = yend_top), inherit.aes = FALSE, size = 1) +
+  geom_segment(data = right_bracket, aes(x = x_bottom, xend = xend_bottom, y = y_bottom, yend = yend_bottom), inherit.aes = FALSE, size = 1) +
+  scale_fill_viridis(option = "B", limits = c(0.0001, 19)) +
+  theme_minimal(base_family = "Source Sans Pro") +
+  theme(
+    axis.title = element_blank(),
+    axis.text = element_blank(),
+    axis.ticks = element_blank(),
+    panel.grid = element_blank(),
+    plot.background = element_rect(fill = "#f6f5f3", color = NA),
+    plot.title = element_text(size = 36, face = "bold", hjust = 0.5)
+  ) +
+  theme(legend.position = "none") + 
+  scale_y_reverse() +
+  geom_tile(data = subset(pred_matrix, is.infinite(n)), fill = "#f6f5f3")
+
+p2 = p2 + 
+  annotate(geom = "text", x = n_cols/ 4, y = -.5, label = "Lag = 0.15s", size = 4) +
+  annotate(geom = "text", x = (n_cols / 2) +( n_cols/ 4), y = -.5, label = "Lag = 0.30s", size = 4) 
+```
+
+```{r mult lags print}
+pv2l / arrow_plot  / p2 + plot_layout(ncol = 1, heights = c(1, 0.2, 1))
+```
+
+----
+
+### Repeat for multiple seconds 
+
+```{r repeat all seconds}
+#| cache: true
+# this will be two panel plot with second 1 and second 2 on top 
+count_df2 = 
+  df2 %>%
+  drop_na() %>% 
+  mutate(vm = cut(vm, breaks=seq(0, 3, 0.25), include.lowest = TRUE),
+         lag_vm = cut(lag_vm, breaks = seq(0, 3, 0.25), include.lowest = TRUE)) %>% 
+  group_by(vm, lag_vm) %>% 
+  count() %>% 
+  mutate(grp =paste0(vm, "_", lag_vm))
+
+plot_df2 = 
+  count_df2 %>% 
+  bind_rows(extra %>% filter(!(grp %in% count_df2$grp))) 
+
+count_df2l2 = 
+  df2_30 %>%
+  drop_na() %>% 
+  mutate(vm = cut(vm, breaks=seq(0, 3, 0.25), include.lowest = TRUE),
+         lag_vm = cut(lag_vm, breaks = seq(0, 3, 0.25), include.lowest = TRUE)) %>% 
+  group_by(vm, lag_vm) %>% 
+  count() %>% 
+  mutate(grp =paste0(vm, "_", lag_vm))
+
+plot_df2l2 = 
+  count_df2l2 %>% 
+  bind_rows(extra %>% filter(!(grp %in% count_df2l2$grp))) 
+
+combo_df2 = 
+  plot_df2 %>% mutate(lag = "Lag = 0.15s") %>% 
+  bind_rows(plot_df2l2 %>% mutate(lag = "Lag = 0.30s"))
+pv2 = combo_df2 %>% 
+  ggplot(aes(x = vm, y = lag_vm, label = n)) + 
+  geom_tile(col = "darkgrey", aes(fill = n)) + 
+  scale_fill_viridis(limits = c(0.0001, 19), option = "B") + 
+  geom_text(data = combo_df2 %>% filter(n > 0) %>% 
+              mutate(tcol = if_else(n >= 11, 0, 1)), 
+              aes(color = factor(tcol))) +
+  scale_color_manual(values = c("black", "white")) +
+  theme(legend.position = "none",
+        axis.text = element_blank(),
+        plot.title = element_text(size = 12, face = "plain")) + 
+  facet_grid(.~lag) + 
+  labs(x = "Acceleration (g)", y = "Lagged acceleration (g)", title = "Second 2") 
+
+pv2a = combo_df2 %>% 
+  ggplot(aes(x = vm, y = lag_vm, label = n)) + 
+  geom_tile(col = "black", aes(fill = n)) + 
+  scale_fill_viridis(limits = c(0.0001, 19), option = "B") + 
+  theme(legend.position = "none",
+        axis.text = element_blank(),
+        plot.title = element_text(size = 12, face = "plain")) + 
+  facet_grid(.~lag) + 
+  labs(x = "Acceleration (g)", y = "Lagged acceleration (g)", title = "Second 2") 
+
+```
+
+```{r repeat seconds}
+#| cache: true
+n_rows = 10
+n_cols = 29 * 2
+counts = c(0, 6, 7, 11, 4, 0, 0, 7, 0, 2, 2, 0, 11, 2, 9, 0, 3, 0, 7, 3, 2, 2, 1,
+           0, 5, 2, 0, 0, 0,
+           0, 0, 6, 4, 6, 0, 0, 3, 5, 0, 0, 0, 14, 2, 5, 4, 0, 0, 10, 4, 1, 0, 0, 6, 1, 0, 0, 0, 0,
+           0, 0, 12, 9, 8, 4, 0, 0, 2, 2, 0, 8, 0, 11, 1, 3, 0, 3, 0, 6, 5, 2, 2, 1, 0, 5,2,0,0, 
+           0, 0, 4, 11, 7, 6, 0, 0, 2, 2, 0, 0, 7, 0, 2, 9, 2, 11, 0, 1, 2, 2, 3, 7, 0, 2,5,0,0)
+# Create a dummy data frame for tiles
+pred_matrix = expand_grid(
+  row = 1:n_rows,
+  col = 1:n_cols
+)  %>% 
+  mutate(n = c(counts, rep(Inf, (n_rows * n_cols) - (2*n_cols))))
+
+# Bracket offsets
+vert_extend = 1.0   # how far the vertical line extends beyond top/bottom
+hor_arm = 0.4       # horizontal arm length
+
+# Left bracket `[`
+left_bracket = tibble(
+  # vertical line
+  x = 0.5 - 0.3, xend = 0.5 - 0.3,
+  y = 0.5 - vert_extend, yend = n_rows + 0.5 + vert_extend,
+  # top horizontal
+  x_top = 0.5 - 0.3, xend_top = 0.5 - 0.3 + hor_arm,
+  y_top = n_rows + 0.5 + vert_extend, yend_top = n_rows + 0.5 + vert_extend,
+  # bottom horizontal
+  x_bottom = 0.5 - 0.3, xend_bottom = 0.5 - 0.3 + hor_arm,
+  y_bottom = 0.5 - vert_extend, yend_bottom = 0.5 - vert_extend
+)
+
+# Right bracket `]`
+right_bracket = tibble(
+  # vertical line
+  x = n_cols + 0.5 + 0.3, xend = n_cols + 0.5 + 0.3,
+  y = 0.5 - vert_extend, yend = n_rows + 0.5 + vert_extend,
+  # top horizontal
+  x_top = n_cols + 0.5 + 0.3, xend_top = n_cols + 0.5 + 0.3 - hor_arm,
+  y_top = n_rows + 0.5 + vert_extend, yend_top = n_rows + 0.5 + vert_extend,
+  # bottom horizontal
+  x_bottom = n_cols + 0.5 + 0.3, xend_bottom = n_cols + 0.5 + 0.3 - hor_arm,
+  y_bottom = 0.5 - vert_extend, yend_bottom = 0.5 - vert_extend
+)
+
+pred_matrix$z_plot = ifelse(is.infinite(pred_matrix$n), max(pred_matrix$n[is.finite(pred_matrix$n)], na.rm = TRUE), pred_matrix$n)
+
+
+# Plot
+p2 = ggplot(pred_matrix, aes(x = col, y = row, fill = z_plot)) + 
+  geom_tile(color = "#f6f5f3", linewidth = 0.5, size = .5) +
+  # Left bracket
+  geom_segment(data = left_bracket, aes(x = x, xend = xend, y = y, yend = yend), inherit.aes = FALSE, size = 1) +
+  geom_segment(data = left_bracket, aes(x = x_top, xend = xend_top, y = y_top, yend = yend_top), inherit.aes = FALSE, size = 1) +
+  geom_segment(data = left_bracket, aes(x = x_bottom, xend = xend_bottom, y = y_bottom, yend = yend_bottom), inherit.aes = FALSE, size = 1) +
+  # Right bracket
+  geom_segment(data = right_bracket, aes(x = x, xend = xend, y = y, yend = yend), inherit.aes = FALSE, size = 1) +
+  geom_segment(data = right_bracket, aes(x = x_top, xend = xend_top, y = y_top, yend = yend_top), inherit.aes = FALSE, size = 1) +
+  geom_segment(data = right_bracket, aes(x = x_bottom, xend = xend_bottom, y = y_bottom, yend = yend_bottom), inherit.aes = FALSE, size = 1) +
+  scale_fill_viridis(option = "B", limits = c(0.0001, 19)) +
+  theme_minimal(base_family = "Source Sans Pro") +
+  theme(
+    axis.title = element_blank(),
+    axis.text = element_blank(),
+    axis.ticks = element_blank(),
+    panel.grid = element_blank(),
+    plot.background = element_rect(fill = "#f6f5f3", color = NA),
+    plot.title = element_text(size = 36, face = "bold", hjust = 0.5)
+  ) +
+  theme(legend.position = "none") + 
+  scale_y_reverse() +
+  geom_tile(data = subset(pred_matrix, is.infinite(n)), fill = "#f6f5f3")
+
+p2  = p2 +
+  annotate(geom = "text", x = n_cols/ 4, y = -.5, label = "Lag = 0.15s", size = 4) +
+  annotate(geom = "text", x = (n_cols / 2) +( n_cols/ 4), y = -.5, label = "Lag = 0.30s", size = 4) +
+  annotate(geom = "text", x = -1.5, y = 1, label = "Sec 1", size = 4) +
+  annotate(geom = "text", x = -1.5, y = 2, label = "Sec 2", size = 4) +
+  annotate(geom = "text", x = n_cols + 2.5, y = 1, label = "Sec 1", size = 4) +
+  annotate(geom = "text", x = n_cols + 2.5, y = 2, label = "Sec 2", size = 4) 
+```
+
+```{r repeat seconds print}
+pv2l = pv2l + labs(title = "Second 1")
+(pv2l + pv2 + plot_layout(axes = "collect")) / arrow_plot  / p2 + plot_layout(ncol = 1, heights = c(1, 0.2, 1))
+```
+
+::: {.notes}
+Before we keep going, we want to see if these summaries will have predictive power? 
+Plot the joint distribution over all seconds for each person
+lighter = higher density
+if each row looks different, then we're onto something: preds dervied from these images should tell us something about identity 
+:::
+
+
+----
+
+### Fingerprints summarize predictors for a given lag and are different across individuals
+
+```{r fprints 3}
+#| cache: true 
+
+s1_dens = 
+ dens_df_s2_l15 %>% mutate(lag = "Lag = 0.15s") %>% 
+  bind_rows(dens_df_s2_l30 %>% mutate(lag = "Lag = 0.30s"))
+
+s2_dens = 
+ dens_df_s4_l15 %>% mutate(lag = "Lag = 0.15s") %>% 
+  bind_rows(dens_df_s4_l30 %>% mutate(lag = "Lag = 0.30s"))
+
+s3_dens = 
+ dens_df_s6_l15 %>% mutate(lag = "Lag = 0.15s") %>% 
+  bind_rows(dens_df_s6_l30 %>% mutate(lag = "Lag = 0.30s"))
+
+s1_dens %>% mutate(id = "Person A") %>% 
+  bind_rows(s2_dens %>% mutate(id = "Person B")) %>% 
+  bind_rows(s3_dens %>% mutate(id = "Person C")) %>%
+  ggplot(aes(x=vm, y=lag_vm, color = density)) +
+  geom_point(size = 0.9, alpha = 0.8) +
+  facet_grid(id~lag) +
+  scale_color_viridis(name = "Density", option = "B") +
+  labs(x = "Acceleration (g)", y = "Lagged Acceleration (g)") +
+  scale_x_continuous(limits = c(0,3)) +
+  scale_y_continuous(limits = c(0,3)) 
+```
+
+---
+
+### Fingerprints summarize predictors for a given lag and are different across individuals
+
+<img src="figs/time_series2.gif" class="gif-inline">
+<img src="figs/fingerprint3.gif" class="gif-inline">
+
+---
+
+
+### Ready to fit models
+
+
+```{r ymat2}
+#| cache: true
+n_rows = 35
+n_cols = 10 
+
+# Create a dummy data frame for tiles
+pred_matrix = expand_grid(
+  row = 1:n_rows,
+  col = 1:n_cols
+) %>% 
+  mutate(subj = 
+           case_when(row %in% c(1:10) ~ 1,
+                     row %in% c(11:20) ~ 2,
+                     row %in% c(21:30) ~ 3,
+                     .default = NA_real_)) %>% 
+  rowwise() %>% 
+  mutate(alpha = runif(1, 0, 1)) %>% 
+  ungroup() %>% 
+  mutate(alpha = if_else(row %in% c(31:34), Inf, alpha))
+
+left_bracket = tibble(
+  # vertical line
+  x = 0.5 - 0.3, xend = 0.5 - 0.3,
+  y = 0.5 - vert_extend, yend = n_rows + 0.5 + vert_extend,
+  # top horizontal
+  x_top = 0.5 - 0.3, xend_top = 0.5 - 0.3 + hor_arm,
+  y_top = n_rows + 0.5 + vert_extend, yend_top = n_rows + 0.5 + vert_extend,
+  # bottom horizontal
+  x_bottom = 0.5 - 0.3, xend_bottom = 0.5 - 0.3 + hor_arm,
+  y_bottom = 0.5 - vert_extend, yend_bottom = 0.5 - vert_extend
+)
+
+# Right bracket `]`
+right_bracket = tibble(
+  # vertical line
+  x = n_cols + 0.5 + 0.3, xend = n_cols + 0.5 + 0.3,
+  y = 0.5 - vert_extend, yend = n_rows + 0.5 + vert_extend,
+  # top horizontal
+  x_top = n_cols + 0.5 + 0.3, xend_top = n_cols + 0.5 + 0.3 - hor_arm,
+  y_top = n_rows + 0.5 + vert_extend, yend_top = n_rows + 0.5 + vert_extend,
+  # bottom horizontal
+  x_bottom = n_cols + 0.5 + 0.3, xend_bottom = n_cols + 0.5 + 0.3 - hor_arm,
+  y_bottom = 0.5 - vert_extend, yend_bottom = 0.5 - vert_extend
+)
+
+p3n = ggplot(pred_matrix, aes(x = col, y = row, fill = factor(subj), alpha = alpha)) + 
+  geom_tile(color = "#f6f5f3", size = 0.5) +
+  # Left bracket
+  geom_segment(data = left_bracket, aes(x = x, xend = xend, y = y, yend = yend), inherit.aes = FALSE, size = 1) +
+  geom_segment(data = left_bracket, aes(x = x_top, xend = xend_top, y = y_top, yend = yend_top), inherit.aes = FALSE, size = 1) +
+  geom_segment(data = left_bracket, aes(x = x_bottom, xend = xend_bottom, y = y_bottom, yend = yend_bottom), inherit.aes = FALSE, size = 1) +
+  # Right bracket
+  geom_segment(data = right_bracket, aes(x = x, xend = xend, y = y, yend = yend), inherit.aes = FALSE, size = 1) +
+  geom_segment(data = right_bracket, aes(x = x_top, xend = xend_top, y = y_top, yend = yend_top), inherit.aes = FALSE, size = 1) +
+  geom_segment(data = right_bracket, aes(x = x_bottom, xend = xend_bottom, y = y_bottom, yend = yend_bottom), inherit.aes = FALSE, size = 1) +
+  theme_minimal(base_family = "Source Sans Pro") +
+  theme(
+    axis.title = element_blank(),
+    axis.text = element_blank(),
+    axis.ticks = element_blank(),
+    panel.grid = element_blank(),
+    plot.background = element_rect(fill = "#f6f5f3", color = NA),
+    plot.title = element_text(size = 36, face = "bold", hjust = 0.5)
+  ) +
+  labs(title = "X") +
+  theme(legend.position = "none") + 
+  scale_fill_manual(values = c("#E69F00", "#56B4E9", "#009E73")) +
+  scale_y_reverse() +
+  geom_tile(data = subset(pred_matrix, is.infinite(alpha)), fill = "#f6f5f3") +
+  annotate(geom = "text", x = n_cols/2 + .35, y = 32.5, label = "...", size = 8, angle = 90) 
+
+
+
+p3n  = p3n +
+  annotate(geom = "label", x = 5.5, y = 3, label = "Predictors from person A",
+           size = 5, color = "#E69F00") +
+  annotate(geom = "label", x = 5.5, y = 14, label = "Predictors from person B", size = 5, color = "#56B4E9") +
+  annotate(geom = "label", x = 5.5, y = 23, label = "Predictors from person C", size = 5, color = "#009E73") +
+  annotate(geom = "label", x = 5.5, y = 35, label = "Predictors from person n", size = 5) 
+```
+
+```{r y matrix updated}
+#| cache: true
+n_cols = 1
+n_rows = 35
+
+pred_matrix = expand_grid(
+  row = 1:n_rows,
+  col = 1:n_cols
+) %>% 
+  mutate(subj = 
+           case_when(row %in% c(1:10) ~ 1,
+                     row %in% c(11:20) ~ 2,
+                     row %in% c(21:30) ~ 3,
+                     TRUE ~ NA_real_)) 
+
+left_bracket = tibble(
+  # vertical line
+  x = 0.5 - 0.3, xend = 0.5 - 0.3,
+  y = 0.5 - vert_extend, yend = n_rows + 0.5 + vert_extend,
+  # top horizontal
+  x_top = 0.5 - 0.3, xend_top = 0.5 - 0.3 + hor_arm,
+  y_top = n_rows + 0.5 + vert_extend, yend_top = n_rows + 0.5 + vert_extend,
+  # bottom horizontal
+  x_bottom = 0.5 - 0.3, xend_bottom = 0.5 - 0.3 + hor_arm,
+  y_bottom = 0.5 - vert_extend, yend_bottom = 0.5 - vert_extend
+)
+
+# Right bracket `]`
+right_bracket = tibble(
+  # vertical line
+  x = n_cols + 0.5 + 0.3, xend = n_cols + 0.5 + 0.3,
+  y = 0.5 - vert_extend, yend = n_rows + 0.5 + vert_extend,
+  # top horizontal
+  x_top = n_cols + 0.5 + 0.3, xend_top = n_cols + 0.5 + 0.3 - hor_arm,
+  y_top = n_rows + 0.5 + vert_extend, yend_top = n_rows + 0.5 + vert_extend,
+  # bottom horizontal
+  x_bottom = n_cols + 0.5 + 0.3, xend_bottom = n_cols + 0.5 + 0.3 - hor_arm,
+  y_bottom = 0.5 - vert_extend, yend_bottom = 0.5 - vert_extend
+)
+
+p4 = pred_matrix %>% 
+  mutate(outcome = case_when(subj == 1 ~ "1",
+                             !is.na(subj) ~ "0",
+                             is.na(subj) & row == 35 ~ "0",
+                             .default = ".")) %>% 
+  ggplot(aes(x = col, y = row, label = outcome, color = as.factor(subj))) + 
+  geom_tile(color = NA, fill = NA, size = 0.5) +
+  # geom_text(size = 3)  +
+  scale_color_manual(values = c("#E69F00", "#56B4E9", "#009E73")) +
+  geom_segment(data = left_bracket, aes(x = x, xend = xend, y = y, yend = yend), inherit.aes = FALSE, size = 1) +
+  geom_segment(data = left_bracket, aes(x = x_top, xend = xend_top, y = y_top, yend = yend_top), inherit.aes = FALSE, size = 1) +
+  geom_segment(data = left_bracket, aes(x = x_bottom, xend = xend_bottom, y = y_bottom, yend = yend_bottom), inherit.aes = FALSE, size = 1) +
+  # Right bracket
+  geom_segment(data = right_bracket, aes(x = x, xend = xend, y = y, yend = yend), inherit.aes = FALSE, size = 1) +
+  geom_segment(data = right_bracket, aes(x = x_top, xend = xend_top, y = y_top, yend = yend_top), inherit.aes = FALSE, size = 1) +
+  geom_segment(data = right_bracket, aes(x = x_bottom, xend = xend_bottom, y = y_bottom, yend = yend_bottom), inherit.aes = FALSE, size = 1) +
+  theme_minimal(base_family = "Source Sans Pro") +
+  theme(
+    axis.title = element_blank(),
+    axis.text = element_blank(),
+    axis.ticks = element_blank(),
+    panel.grid = element_blank(),
+    plot.background = element_rect(fill = "#f6f5f3", color = NA),
+    plot.title = element_text(size = 36, face = "bold", hjust = 0.5)
+  ) +
+  labs(title = "Y") +
+  theme(legend.position = "none") + 
+  scale_y_reverse() 
+
+p4 = 
+  p4 +
+  annotate(geom = "text", x = 1, y = 7, label = "1", size = 12, color = "#E69F00") +
+  annotate(geom = "text", x = 1, y = 15, label = "0", size = 12) +
+  annotate(geom = "text", x = 1, y = 19, label = ".", size = 12) +
+  annotate(geom = "text", x = 1, y = 21, label = ".", size = 12) +
+  annotate(geom = "text", x = 1, y = 23, label = ".", size = 12) +
+  annotate(geom = "text", x = 1, y = 30, label = "0", size = 12) 
+
+p4 + p3n + plot_layout(ncol = 2, widths = c(0.3, 1)) 
+```
+
+---
+
+### Data 
+
+
+<div style="font-size: 150%;">
++ N = 32
++ 6 minutes of walking each
++ 3:1 train/test split 
+
+</div>
+
+![@iu_dat](figs/iu_data.png){width=50%, fig-align="left"}
+
+---
+
+### Results 
+
+```{r paper 1 res}
+#| cache: true 
+
+
+pred_df %>% 
+  group_by(true_subject) %>% 
+  mutate(max = max(prob)) %>% 
+  ungroup() %>% 
+  mutate(correct = (prob == max & true_subject == pred_subject) * 1) %>%
+  ggplot(aes(x = factor(true_subject), y = prob, color = factor(correct))) + 
+  geom_jitter(width = .1, alpha = 0.9) +
+  theme(legend.position = "bottom",
+        axis.ticks.x = element_blank(),
+        panel.grid.major.x = element_blank(),
+        panel.grid.minor.x = element_blank(),
+        legend.text = element_text(size = 14),
+        legend.title = element_text(size = 15)) +
+  scale_color_manual(values = c("#CC79A7", "#009E73"),
+                     labels = c("Models trained for other participants", "Model trained for correct participant"),
+                     name = "Prediction from:") +
+  labs(x = "Participant", y = "Predicted Probability",
+       title = "100% rank-1 accuracy in 32 participants") +
+  guides(color = guide_legend(override.aes = list(size = 4, alpha = 1))) +
+  scale_y_continuous(breaks = seq(0, 1, 0.1), limits = c(-0.01, 1.01)) +
+  annotate(geom = "text",
+           color = "#444444",
+           hjust = 0,
+           label = "Green point above pink points\nin each column indicates\ncorrect identification",
+           x = "23", y = 0.8) +
+  geom_segment(xend = "22", x = "23", y = 0.8, yend = 0.85,
+    arrow = arrow(length = unit(0.05, "inches"), type = "closed"),
+    color = "#444444",
+    linewidth = .3)
+
+```
+
+<div style=" position: absolute; bottom: 1em; right: -4em; font-size: 0.7em; color: #777; "> @Koffman2023 </div>
+
+::: {.notes}
+
+Each column has n points, one point per model, point corresponding to the model trained for correct subject is green. if above all pink points, person is correctly identified, and larger separation means bigger discrimination between correct subject and second-most likely subject
+:::
+
+
+---
+
+### Why not use all possible lags? 
+
+---
+
+### Why not use all possible lags? 
+#### Functional regression approach 
+
+
+![](figs/test1.png)
+
+::: footer
+Hat tip to [Edward Gunning](https://edwardgunning.github.io/) for the idea for these figures
+:::
+
+---
+
+### Why not use all possible lags? 
+
+#### Functional regression approach 
+
+![](figs/test2.png)
+
+::: footer
+Hat tip to [Edward Gunning](https://edwardgunning.github.io/) for the idea for these figures
+:::
+---
+
+### Why not use all possible lags? 
+
+#### Functional regression approach 
+
+![](figs/test3.png)
+
+::: footer
+Hat tip to [Edward Gunning](https://edwardgunning.github.io/) for the idea for these figures
+:::
+
+::: {.notes}
+Three matrices represent every combination of acceleration, lag acceleration, and lag observed in each second (each row is a second)
+::: 
+
+---
+
+### Why not use all possible lags? 
+
+#### Functional regression approach 
+ 
+![](figs/test4.png)
+
+::: footer
+Hat tip to [Edward Gunning](https://edwardgunning.github.io/) for the idea for these figures
+:::
+
+---
+
+
+### Functional regression approach 
+<div style="font-size: 80%;">
+
+**Toy example**: 4 observations per second, 2 seconds, 1 individual
+
+$v_j(s)$: $s^{th}$ acceleration observation in second $j$
+
+data
+$$\begin{bmatrix} v_1(1) & v_1(2) & v_1(3) & v_1(4) \\
+v_2(1) & v_2(2) & v_2(3) & v_2(4) \\
+\end{bmatrix}
+$$ 
+
+---
+
+### Functional regression approach
+
+<div style="font-size: 80%;">
+
+**Toy example**: 4 observations per second, 2 seconds, 1 individual
+
+$v_j(s)$: $s^{th}$ acceleration observation in second $j$
+
+data
+$$\begin{bmatrix} v_1(1) & v_1(2) & v_1(3) & v_1(4) \\
+v_2(1) & v_2(2) & v_2(3) & v_2(4) \\
+\end{bmatrix}
+$$ 
+
+
+acceleration matrix $$\begin{bmatrix} \color{blue}{v_1(2)} & \color{blue}{v_1(3)} &  \color{blue}{v_1(4)} & \color{teal}{v_1(3)} & \color{teal}{v_1(4)} & \color{violet}{v_1(4)} \\
+\color{blue}{v_2(2)} & \color{blue}{v_2(3)} &  \color{blue}{v_2(4)} & \color{teal}{v_2(3)} & \color{teal}{v_2(4)} & \color{violet}{v_2(4)} \\
+\end{bmatrix}
+$$ 
+lag acceleration matrix $$\begin{bmatrix} \color{blue}{v_1(1)} & \color{blue}{v_1(2)} & \color{blue}{v_1(3)} & \color{teal}{v_1(1)} & \color{teal}{v_1(2)} &\color{violet}{ v_1(1)} \\
+\color{blue}{v_2(1)} & \color{blue}{v_2(2)} & \color{blue}{v_2(3)} & \color{teal}{v_2(1)} & \color{teal}{v_2(2)} &\color{violet}{ v_2(1)} \\
+\end{bmatrix}
+$$ 
+
+lag matrix $$\begin{bmatrix} \color{blue}{1} & \color{blue}{1} & \color{blue}{1} & \color{teal}{2} & \color{teal}{2} & \color{violet}{3}\\
+\color{blue}{1} & \color{blue}{1} & \color{blue}{1} & \color{teal}{2} & \color{teal}{2} & \color{violet}{3}\\\end{bmatrix}
+$$ 
+
+Number columns: $4 \cdot (4-1) / 2 = 6$ 
+</div>
+
+::: {.notes}
+First talk about how we construct the matrix, then talk about functional regression
+:::
+
+---
+
+
+### Functional regression: background
+
+
+We're familiar with predicting a (scalar) outcome using a (scalar) predictor
+
+$$Y_i = \alpha + \beta X_i + \epsilon_i$$
+
+
+```{r lreg}
+#| cache: true 
+set.seed(1)
+n = 200
+x = rnorm(n)
+y = 1 + 2 * x + rnorm(n, sd = .8)
+sample_dat = tibble(x = x, y = y)
+
+sample_dat %>% 
+  ggplot(aes(x, y)) +
+  geom_point(alpha = .6) +
+  geom_smooth(method = "lm", se = FALSE, linewidth = 1, color = "#0072B2") +
+  labs(x = "Predictor (X)", y = "Outcome (Y)") +
+  annotate(geom = "label", 
+           label = "hat(beta) == 1.9", parse = TRUE,
+           x = 2, y = 0, color = "#0072B2", size = 5) 
+
+
+```
+
+
+---
+
+### Functional regression: background
+
+
+Sometimes our predictor is a series of values over time rather than a single value 
+
+We can think of this as having many correlated predictors: 
+
+$$Y_i = \alpha + \beta_1X_i(t_1) + \beta_2X_i(t_2) + \dots + \beta_TX_i(t_T) + \epsilon_i$$
+
+---
+
+### Functional regression: background
+
+
+Sometimes our predictor is a series of values over time rather than a single value 
+
+We can think of this as having many correlated predictors: 
+
+$$Y_i = \alpha + \beta_1X_i(t_1) + \beta_2X_i(t_2) + \dots + \beta_TX_i(t_T) + \epsilon_i$$
+```{r freg 2}
+#| cache: true 
+
+
+set.seed(123)
+t = seq(0, 1, length.out = 200)
+
+# ---- generate base shapes using combinations of sine & cosine ----
+X1 =  0.8*sin(2*pi*t) + 0.4*cos(4*pi*t)
+X2 = -0.6*sin(3*pi*t + 0.3) + 0.9*cos(2*pi*t)
+X3 =  1.1*sin(5*pi*t - 0.4) - 0.3*cos(3*pi*t)
+
+dfX = tibble(
+  t = t,
+  subj1 = X1,
+  subj2 = X2,
+  subj3 = X3
+) %>%
+  pivot_longer(-t, names_to = "id", values_to = "X")
+
+# Put in a data frame + optionally smooth with GAM
+dfX = dfX %>%
+  group_by(id) %>%
+  group_modify(~ {
+    mod = gam(X ~ s(t, k = 20), data = .x)
+    .x$X = predict(mod, newdata = .x)
+    .x
+  })
+
+# ---- coefficient function ----
+beta = tibble(
+  t = t,
+  beta = 1.8*exp(-((t - 0.30)^2)/0.015) -
+    1.3*exp(-((t - 0.72)^2)/0.01)
+)
+
+# ---- product for Subject 1 ----
+dfProd = dfX %>%
+  filter(id == "subj1") %>%
+  left_join(beta, by = "t") %>%
+  mutate(prod = X * beta)
+
+# ---- plotting ----
+p1 = ggplot(dfX, aes(t, X, color = id)) +
+  geom_point() +
+  # geom_line(linewidth = 1.2, alpha = 0.9) +
+  labs(title = expression(Functional ~ Predictors ~ X[i](t)), y = "Value", x = "Time (t)") +
+  scale_color_manual(values = c( "#56B4E9", "#E69F00", "#CC79A7"),
+                     name = "Subject", labels = c("1", "2", "3")) +
+  theme(legend.position = c(.7, .8),
+        legend.background = element_rect(fill = "white",color = "white"),
+        legend.text = element_text(size = 14),
+        legend.title = element_text(size = 15)) +
+  guides(color = guide_legend(nrow = 1))
+
+p1 = dfX %>% filter(id == "subj1") %>% 
+  ggplot(aes(t, X, color = id)) +
+  geom_point(size = .9) +
+  # geom_line(linewidth = 1.2, alpha = 0.9) +
+  labs(title = "Data from Subject 1", y = expression(X[1](t)), x = "Time (t)") +
+  scale_color_manual(values = c("#56B4E9")) +
+  theme(legend.position = "none",
+        legend.background = element_rect(fill = "white",color = "white"),
+        legend.text = element_text(size = 14),
+        legend.title = element_text(size = 15)) +
+  guides(color = guide_legend(nrow = 1))
+
+
+p2 = ggplot(beta, aes(t, beta)) +
+  geom_line(linewidth = 1.3, alpha = 0.9, color = "#009E73") +
+  labs(title =expression(Coefficient ~ Function ~ hat(beta)(t)), y = "Value", x = "Time (t)") +
+  geom_hline(aes(yintercept = 0), linetype = "dashed")+
+  annotate(geom = "label", x = 0.25, y = 0.5, label = "Weight for time t = 0.25", size = 5, color = "#444444", vjust = 1) +
+  annotate(geom = "segment", x= 0.25, xend = .25, y = 0.5, yend = 1.45,
+           arrow = arrow(length = unit(0.05, "inches"), type = "closed"),
+           color = "#444444") +
+  annotate(geom = "point", color = "black", size = 2, x = 0.251, y = 1.54)
+
+
+p3 = ggplot(dfProd, aes(t, prod)) +
+  geom_area(alpha = 0.35, fill = "#56B4E9") +
+  geom_line(linewidth = 1.2, color = "#56B4E9") +
+  # labs(title = expression(Contribution ~ from ~ Subject ~ 1: ~  X[1]~(t)~x~ hat(β)~(t)),, y = "Value", x = "Time (t)")
+  labs(title = expression(Pointwise ~ contributions: ~ X[1](t) ~ times ~ hat(beta)(t)),
+       y = "Value", x = "Time (t)")
+
+p3_bar = ggplot(dfProd, aes(t, prod)) + 
+  geom_col(width = diff(range(t)) / length(t), fill = "#56B4E9", alpha = 0.8, color = "#444444") +
+  labs(title = expression(Pointwise ~ contributions: ~ X[1](t) ~ x ~ hat(beta)(t) ~ x ~ Delta ~t),
+       y = "Value", x = "Time (t)")
+
+dt = diff(range(t)) / (length(t) - 1)
+
+p3_bar = ggplot(dfProd, aes(t, prod)) + 
+  geom_col(
+    width = dt,
+    fill = "#56B4E9",
+    alpha = 0.85,
+    color = "#444444",
+    linewidth = 0.2
+  ) +
+  labs(
+    # title = expression(Riemann ~ sum: ~ sum(X[1](t[k])~hat(beta)(t[k])~Delta~t)),
+    title = "Contribution to outcome",
+    subtitle = "Each bar = one term in the sum",
+    y = expression(X[1](t)~hat(beta)(t)),
+    x = "Time (t)"
+  ) 
+ymin = min(dfProd$prod, 0)
+
+p3_bar = p3_bar +
+  geom_segment(
+    x = min(t), xend = max(t),
+    y = ymin - 0.1 * diff(range(dfProd$prod)),
+    yend = ymin - 0.1 * diff(range(dfProd$prod)),
+    linewidth = 0.8,
+    color = "#444444"
+  ) +
+  geom_segment(
+    x = min(t), xend = min(t),
+    y = ymin - 0.08 * diff(range(dfProd$prod)),
+    yend = ymin - 0.12 * diff(range(dfProd$prod)),
+    linewidth = 0.8,
+    color = "#444444"
+  ) +
+  geom_segment(
+    x = max(t), xend = max(t),
+    y = ymin - 0.08 * diff(range(dfProd$prod)),
+    yend = ymin - 0.12 * diff(range(dfProd$prod)),
+    linewidth = 0.8,
+    color = "#444444"
+  ) +
+  annotate(
+    "text",
+    x = mean(t),
+    y = ymin - 0.18 * diff(range(dfProd$prod)),
+    label = expression(paste("Total contribution  ", approx, "  ", sum(X(t[k])~beta(t[k])~Delta~t))),
+    size = 5,
+    color = "#444444"
+  )
+
+highlight_idx = c(30)
+df_highlight = dfProd %>% slice(highlight_idx)
+
+p3_bar = p3_bar +
+  geom_col(
+    data = df_highlight,
+    aes(t, prod),
+    width = dt,
+    fill = "#E69F00",
+    alpha = 0.9
+  ) +
+  annotate(
+    "label",
+    x = df_highlight$t[1],
+    y = df_highlight$prod[1] + 0.1 * diff(range(dfProd$prod)),
+    label = expression(X(t[k])~beta(t[k])~Delta~t),
+    size = 4,
+    color = "#E69F00",
+    hjust = 0
+  )
+p1
+
+# plot: pointwise contribution of the functional predictor X_i(t) to the outcome Y thru the functionalcoefficient beta(t) 
+
+# vertical slice: how much predictor is contributing to the LP 
+
+# integral over t: total contribution of X_i(t) to value of Y_i
+
+
+```
+
+::: {.notes}
+
+Highly correlated predictors 
+n << p problems
+:::
+
+
+---
+
+### Functional regression: background
+
+Instead of estimating a separate coefficient at each time point:
+
+$$
+Y_i = \alpha + \sum_{k=1}^T \beta_k X_i(t_k) + \epsilon_i
+$$
+
+We model the coefficients as a **smooth function of time**:
+
+$$
+Y_i \approx \alpha + \sum_{k=1}^T X_i(t_k)\,\beta(t_k)\,\Delta t + \epsilon_i
+$$
+
+(**Riemann sum** approximation; in the limit, this becomes an integral)
+
+
+---
+
+
+
+### Functional regression: background
+
+$$
+Y_i \approx \alpha + \sum_{k=1}^T X_i(t_k)\,\beta(t_k)\,\Delta t + \epsilon_i
+$$
+
+```{r freg2}
+p2
+```
+
+::: {.notes}
+X_i(t_k): value of curve at t_k
+beta(t_k): weight at time t_k
+delta t: width of each time bin
+:::
+
+---
+
+
+### Functional regression: background
+
+$$
+Y_i \approx \alpha + \sum_{k=1}^T X_i(t_k)\,\beta(t_k)\,\Delta t + \epsilon_i
+$$
+
+```{r freg3}
+p3_bar
+```
+
+---
+
+
+### Functional regression: background
+
++ Previous model took 1D function $X(t)$ as predictor
++ Can generalize to more dimensions
++ Instead of a curve, the functional coefficient becomes a multivariate surface 
+
+```{r freg surface 2}
+#| cache: true
+#| fig-width: 14
+#| fig-height: 6.5
+#| out-width: "100%"
+
+pp = dd1 %>% 
+  mutate(lag = "Lag = 0.01s") %>% 
+  bind_rows(dd2 %>% mutate(lag = "Lag = 0.02s")) %>% 
+  bind_rows(dd50 %>% mutate(lag = "Lag = 0.50s")) %>% 
+  bind_rows(dd99 %>% mutate(lag = "Lag = 0.99s")) %>% 
+  ggplot(aes(x=vm, y=lag_vm, color = density)) +
+  geom_point(size = 0.9, alpha = 0.8) +
+  facet_grid(.~lag) +
+  scale_color_viridis(name = "Density", option = "B") +
+  labs(x = "Acceleration (g)", y = "Lagged Acceleration (g)") +
+  scale_x_continuous(limits = c(0,3)) +
+  scale_y_continuous(limits = c(0,3)) 
+
+  
+plot_ly(
+  dens_res2,
+  x = ~vm,
+  y = ~lag_vm,
+  z = ~lag,
+  # color = ~density,
+  # colors = viridis::viridis(100, option = "B"),
+  type = "scatter3d",
+  mode = "markers",
+  marker = list(size = 1, opacity = 0.5, color = "black")
+) %>%
+  layout(
+    margin = list(l = 80, r = 80, b = 80, t = 0), 
+    title = list(text = "Predictors for one person and one second", y = 0.95),
+    scene = list(
+      xaxis = list(title = "Acceleration (g)"),
+      yaxis = list(title = "Lag Acceleration (g)"),
+      zaxis = list(title = "Lag (s)")
+      # camera = list(eye = list(x = 1.5, y = 1.5, z = 1.5))
+
+    )
+  ) 
+```
+
+---
+
+### Functional regression: background
+
+```{r s4}
+#| fig-width: 14
+#| fig-height: 8
+#| cache: true
+#| out-width: "100%"
+
+plot_ly(
+  dens_res,
+  x = ~vm,
+  y = ~lag_vm,
+  z = ~lag,
+  color = ~density,
+  colors = viridis::viridis(100, option = "B"),
+  type = "scatter3d",
+  mode = "markers",
+  marker = list(size = 1, opacity = 0.5) 
+) %>%
+  colorbar(title = "Density") %>%
+  layout(
+    title = list(text = "Subset of predictors for one person", y = 0.95),
+    # INCREASE margins here to prevent label clipping
+    margin = list(l = 80, r = 80, b = 80, t = 0), 
+    scene = list(
+      xaxis = list(title = "Acceleration (g)"),
+      yaxis = list(title = "Lag Acceleration (g)"),
+      zaxis = list(title = "Lag (s)")
+      # Optional: Adjust camera to zoom out slightly if labels still clip
+      # camera = list(eye = list(x = 1.5, y = 1.5, z = 1.5))
+    )
+  )
+
+
+```
+
+
+---
+
+### Functional regression: background
+
+
+```{r s5}
+#| fig-width: 14
+#| fig-height: 8
+#| cache: true
+#| out-width: "100%"
+
+plot_ly(
+  dens_res6,
+  x = ~vm,
+  y = ~lag_vm,
+  z = ~lag,
+  color = ~density,
+  colors = viridis::viridis(100, option = "B"),
+  type = "scatter3d",
+  mode = "markers",
+  marker = list(size = 1, opacity = 0.5) 
+) %>%
+  colorbar(title = "Density") %>%
+  layout(
+    title = list(text = "Subset of predictors for different person", y = 0.95),
+    # INCREASE margins here to prevent label clipping
+    margin = list(l = 80, r = 80, b = 80, t = 0), 
+    scene = list(
+      xaxis = list(title = "Acceleration (g)"),
+      yaxis = list(title = "Lag Acceleration (g)"),
+      zaxis = list(title = "Lag (s)")
+      # Optional: Adjust camera to zoom out slightly if labels still clip
+      # camera = list(eye = list(x = 1.5, y = 1.5, z = 1.5))
+    )
+  )
+
+```
+
+
+---
+
+### Functional regression approach 
+<div style="font-size: 95%;">
+
+Model outcomes as: 
+
+$$Y_{ij}^{i_0}\sim\text{Bernoulli}(p_{ij}^{i_0})$$
+
+where $Y_{ij}^{i_0} = 1$ if subject $i$ in second $j$ belongs to subject $i_0$, and 0 otherwise
+
+</div>
+
+::: {.notes}
+For each subject we model probability that the data belongs to that person
+Model that binary outcome with a trivariate functional regression
+Let the data define smooth surface F that relates acceleration, lag acceleration, and lag length to probability of identity
+Captures dynamic changes in signal: how fast it increases, decreases 
+Fit w/ penalized splines to allow F to be flexible but smooth across the 3 domains 
+:::
+
+---
+
+### Functional regression approach 
+
+<div style="font-size: 95%;">
+
+Model outcomes as: 
+
+$$Y_{ij}^{i_0}\sim\text{Bernoulli}(p_{ij}^{i_0})$$
+
+where $Y_{ij}^{i_0} = 1$ if subject $i$ in second $j$ belongs to subject $i_0$, and 0 otherwise
+
+Model: 
+
+$$\text{logit}(p_{ij}^{i_0}) = \beta_0^{i_0} + \sum_{u=1}^{S} \sum_{s=u}^{S} F_{i_0} \{ v_{ij}(s), v_{ij}(s-u), u \} $$
+</div>
+
+---
+
+
+### Functional regression approach 
+<div style="font-size: 95%;">
+Model outcomes as: 
+
+$$Y_{ij}^{i_0}\sim\text{Bernoulli}(p_{ij}^{i_0})$$
+
+where $Y_{ij}^{i_0} = 1$ if subject $i$ in second $j$ belongs to subject $i_0$, and 0 otherwise
+
+Model: 
+
+$$\text{logit}(p_{ij}^{i_0}) = \beta_0^{i_0} + \sum_{u=1}^{S} \sum_{s=u}^{S} F_{i_0} \{ v_{ij}(s), v_{ij}(s-u), u \} $$
+
+$u = 1, \dots, S$ (index of lag length)
+
+$s = u, \dots, S$ (index of current time point)
+
+$v_{ij}(s)$ = value of acceleration for subject $i$, second $j$, at time index $s$
+
+
+$F(\cdot, \cdot, \cdot)$: trivariate smooth function, takes values at every point in the domain of acceleration, lag acceleration, lag length
+</div>
+
+---
+
+### Functional regression approach 
+<div style="font-size: 95%;">
+Model outcomes as: 
+
+$$Y_{ij}^{i_0}\sim\text{Bernoulli}(p_{ij}^{i_0})$$
+
+where $Y_{ij}^{i_0} = 1$ if subject $i$ in second $j$ belongs to subject $i_0$, and 0 otherwise
+
+Model: 
+
+```{r}
+#| include: false 
+# $$\text{logit}(p_{ij}^{i_0}) =\beta_0^{i_0} + \int_{u=1}^S\int_{s=u}^SF_{i_0}\{ v_{ij}(s), v_{ij}(s-u), u\}dsdu $$
+```
+
+$$\text{logit}(p_{ij}^{i_0}) = \beta_0^{i_0} + \sum_{u=1}^{S} \sum_{s=u}^{S} F_{i_0} \{ v_{ij}(s), v_{ij}(s-u), u \} $$
+
+$u = 1, \dots, S$ (index of lag length)
+
+$s = u, \dots, S$ (index of current time point)
+
+$v_{ij}(s)$ = value of acceleration for subject $i$, second $j$, at time index $s$
+
+
+$F(\cdot, \cdot, \cdot)$: trivariate smooth function, takes values at every point in the domain of acceleration, lag acceleration, lag length
+
+Fit using penalized splines with a quadratic penalty on the functional coefficient [@Wood2016]
+
+</div>
+---
+
+### Functional regression approach: implementation
+
+<div style="font-size: 1.8em;">
+
+```{r gam}
+#| eval: false
+#| echo: true 
+
+model = mgcv::gam(
+  Y ~ te(
+    accel_mat,
+    lag_accel_mat,
+    lag_mat,
+    k = c(5, 5, 5),
+    by = weight_mat),
+  family = binomial(),
+  method = "REML"
+)
+```
+
+</div>
+
++ $\texttt{te()}$: tensor product smooth 
+
++ $\texttt{k = c(5, 5, 5)}$ number of basis functions for each dimension of the tensor product smooth
+
++ $\texttt{weight\_mat}$: matrix of weights of linear functionals of smooth terms. We use equal weights so the $i,j^{\mathrm{th}}$ entry is $\texttt{1/ncol(accel\_mat)}$
+
++ $\texttt{method="REML"}$: smoothing parameter selection with restricted maximum likelihood 
+
+::: {.notes}
+125 basis functions
+:::
+
+---
+
+
+
+### Connection between two methods 
+
+<div style="font-size: 150%;">
+
+::: {.incremental}
++ Functional approach is generalization of grid cell approach 
++ Instead of discretizing space into cells, relationship between acceleration, lag acceleration, lag length is modeled as smooth, continuous surface $F$
++ Grid cell approach: piecewise constant approximation of $F$
++ Both leverage same underlying structure: how acceleration, lag acceleration pairs characterize movement
+
+:::
+
+</div>
+
+::: {.notes}
+Grid cell approach: piecewise const version of F, where effect is constant within each cell region. Freg: smooths over that grid, using penalized splines instead of the fixed bins 
+::: 
+
+---
+
+### New dataset 
+
+
+:::: {.columns}
+
+::: {.column width="60%"}
+
+<div style="font-size: 150%;">
+
++ 153 individuals
++ 3 minutes of walking each
++ Two sessions at least one week apart 
+
+</div>
+:::
+
+::: {.column width="40%"}
+
+![ZJU-GaitAcc [@zju_dat]](figs/zju.png){fig-align="left"}
+
+:::
+
+::::
+
+
+---
+
+### Functional regression results
+
+:::: {.columns}
+
+::: {.column width="45%"}
+
+Rank-1 (rank-5) % accuracies 
+
+
++ Train and test on session 1
+  + Logistic regression: 92 (97) 
+  + <span style="color:#009E73;">Functional regression: 98 (100)</span>
+
++ Train on session 1, test on session 2 
+  + Logistic regression: 41 (75)
+  + <span style="color:#009E73;">Functional regression: 53 (69)</span>
+:::
+
+::: {.column width="55%"}
+
+:::
+
+::::
+
+---
+
+### Why not use fancier models? 
+
+:::: {.columns}
+
+::: {.column width="45%"}
+
+Rank-1 (rank-5) % accuracies 
+
+
++ Train and test on session 1
+  + Logistic regression: 92 (97) 
+  + <span style="color:#009E73;">Functional regression: 98 (100)</span>
+  + XGBoost: 93 (99)
+
++ Train on session 1, test on session 2 
+  + Logistic regression: 41 (75)
+  + Functional regression: 53 (69)
+  + <span style="color:#009E73;">XGBoost: 58 (78)</span>
+
+:::
+
+
+::: {.column width="55%"}
+
+![](figs/forest.png){width=50%}
+
+![](figs/rocket2.png){width=50%}
+
+:::
+
+::::
+
+<div style=" position: absolute; bottom: 1em; right: -4em; font-size: 0.7em; color: #777; "> @Koffman2024 </div>
+
+---
+
+## Outline {.question-bullets}
+<div style="font-size: 115%;">
+- Can we identify someone from their walking pattern measured by a wrist-worn accelerometer? *(Digital fingerprinting)*
+<br>
+$\rightarrow$ Yes! 
+
+- <span style="color:gray;">Can we identify someone from their walking pattern measured by a wrist-worn accelerometer in big, free-living datasets?</span>
+
+- <span style="color:gray;"> What else can we learn from walking patterns in free-living data? </span>
+- <span style="color:gray;">Can we apply these methods to other high-density data sources? </span>
+</div>
+
+---
+
+## Outline {.question-bullets}
+<div style="font-size: 115%;">
+
+- <span style="color:gray;">Can we identify someone from their walking pattern measured by a wrist-worn accelerometer? *(Digital fingerprinting)* </span>
+<br>
+<span style="color:gray;">$\rightarrow$ Yes! </span>
+- Can we identify someone from their walking pattern measured by a wrist-worn accelerometer in big, free-living datasets?
+- <span style="color:gray;"> What else can we learn from walking patterns in free-living data? </span>
+- <span style="color:gray;">Can we apply these methods to other high-density data sources? </span>
+</div>
+
+
+
+
+# Can we identify someone from their walking pattern measured by a wrist-worn accelerometer in big, free-living datasets?
+
+---
+
+### Digital fingerprinting in NHANES 
+
+<div style="font-size: 125%;">
+
+- Use highly specific method to identify walking in NHANES (minimize false positives) [@Karas2019]
+- $N = 13{,}000$ individuals with 3 minutes walking per person 
+- 3:1 train/test split 
+- Logistic regression + weighting to overcome class imbalance
+- <span style="color:#009E73;">43\%</span> rank-1 accuracy 
+- <span style="color:#009E73;">73\%</span> rank-5 accuracy
+- <span style="color:#009E73;">97\%</span> rank-1\% accuracy (correct subject is in the top 130 predictions)
+- <span style="color:#009E73;">100\%</span> rank-5\% accuracy (correct subject is in the top 650 predictions)
+
+</div>
+---
+
+
+### Digital fingerprinting in NHANES 
+
+
+```{r nh fingerprint}
+#| cache: true
+p1 = dens_df %>%
+  filter(id == 78898) %>%
+  mutate(data = factor(data, levels = c("train", "test"), labels = c("Training", "Testing"))) %>%
+  ggplot(aes(x = vm, y = lag_vm, color = density)) +
+  geom_point(size = .85) +
+  scale_color_viridis_b(name = "Density", option = "B") +
+  facet_grid(data~.) +
+  labs(x = "Acceleration (g)", y = "Lag Acceleration (g)") +
+  scale_x_continuous(limits=c(0,3), breaks=seq(0, 3, 1)) +
+  scale_y_continuous(limits=c(0,3), breaks=seq(0, 3, 1)) +
+  theme(legend.position = c(0.9, 0.7),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+
+p2 = sample_dat2 %>%
+  filter(id == 78898) %>%
+  mutate(data = factor(data, levels = c("train", "test"), labels = c("Training", "Testing"))) %>%
+  group_by(data) %>%
+  mutate(row = row_number()) %>%
+  filter(row <= 800) %>%
+  ungroup() %>%
+  ggplot(aes(x = row, y = vm)) +
+  geom_line() +
+  facet_grid(data~.) +
+  scale_x_continuous(breaks=seq(0, 800, 80), labels = seq(0, 10, 1)) +
+  scale_y_continuous(limits=c(0, 2.5), breaks = seq(0, 2, 1)) +
+  labs(x = "Time (sec)", y = "Acceleration (g)") +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+
+
+p3 = dens_df %>%
+  filter(id == 68561) %>%
+  mutate(data = factor(data, levels = c("train", "test"), labels = c("Training", "Testing"))) %>%
+  ggplot(aes(x = vm, y = lag_vm, color = density)) +
+  geom_point(size = .85) +
+  scale_color_viridis_b(option = "B", name = "Density") +
+  facet_grid(data~.) +
+  labs(x = "Acceleration (g)", y = "Lag Acceleration (g)") +
+  scale_x_continuous(limits=c(0,3), breaks=seq(0, 3, 1)) +
+  scale_y_continuous(limits=c(0,3), breaks=seq(0, 3, 1)) +
+  theme(legend.position = c(0.9, 0.7),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+
+p4 = sample_dat2 %>%
+  filter(id == 68561) %>%
+  mutate(data = factor(data, levels = c("train", "test"), labels = c("Training", "Testing"))) %>%
+  group_by(data) %>%
+  mutate(row = row_number()) %>%
+  filter(row <= 800) %>%
+  ungroup() %>%
+  ggplot(aes(x = row, y = vm)) +
+  geom_line() +
+  facet_grid(data~.) +
+  scale_x_continuous(breaks=seq(0, 800, 80), labels = seq(0, 10, 1)) +
+  scale_y_continuous(limits=c(0,2.5), breaks = seq(0, 2, 1)) +
+  labs(x = "Time (sec)", y = "Acceleration (g)") +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+
+(p2 + p1) / (p4 + p3)
+```
+
+<div style=" position: absolute; bottom: 0.5em; right: -4em; font-size: 0.7em; color: #777; "> @nhanes_fprint </div>
+
+---
+
+
+## Outline {.question-bullets}
+<div style="font-size: 115%;">
+
+- <span style="color:gray;">Can we identify someone from their walking pattern measured by a wrist-worn accelerometer? *(Digital fingerprinting)* </span>
+<br>
+<span style="color:gray;">$\rightarrow$ Yes! </span>
+- Can we identify someone from their walking pattern measured by a wrist-worn accelerometer in big, free-living datasets?
+<br>
+$\rightarrow$ Yes!
+- <span style="color:gray;"> What else can we learn from walking patterns in free-living data? </span>
+- <span style="color:gray;">Can we apply these methods to other high-density data sources? </span>
+</div>
+
+---
+
+## Outline {.question-bullets}
+<div style="font-size: 115%;">
+
+- <span style="color:gray;">Can we identify someone from their walking pattern measured by a wrist-worn accelerometer? *(Digital fingerprinting)* </span>
+<br>
+<span style="color:gray;">$\rightarrow$ Yes! </span>
+- <span style="color:gray;"> Can we identify someone from their walking pattern measured by a wrist-worn accelerometer in big, free-living datasets? </span>
+<br> 
+<span style="color:gray;">$\rightarrow$ Yes! </span>
+- What else can we learn from walking patterns in free-living data? 
+- <span style="color:gray;">Can we apply these methods to other high-density data sources? </span>
+</div>
+
+
+# What else can we learn from walking patterns in free-living data? 
+
+---
+
+### Counting steps in NHANES 
+
++ $>15,000$ participants
++ $7$ days of wrist accelerometry
++ $10$Tb of data 
++ Over 1 year computation time 
++ Open source processing pipeline 
++ Publicly available data repository 
++ **First** nationally representative estimate of steps in the US population using open source algorithms
+
+![](figs/physionet.png){width=70%}
+<div style=" position: absolute; bottom: 0.5em; right: -4em; font-size: 0.7em; color: #777; "> @physionet </div>
+
+---
+
+### Counting steps in NHANES 
+
+How many average daily steps do Americans take?
+
+```{r ridges}
+#| cache: true 
+
+xdf = steps %>% 
+  select(age = age_in_years_at_screening, gender, (contains("total") & contains("step"))) %>% 
+  mutate(age = if_else(is.na(age), 0, age)) %>% 
+ mutate(age_cat = cut(age, breaks = c(0, 17, 29, 39, 49, 59, 69, Inf)), include.lowest = TRUE) 
+
+m_ya = median(xdf$total_scsslsteps[xdf$age_cat == "(17,29]"])
+m_child  = median(xdf$total_scsslsteps[xdf$age_cat == "(0,17]"])
+m_old = median(xdf$total_scsslsteps[xdf$age_cat == "(69,Inf]"])
+
+
+xdf %>% 
+  select(age_cat, steps = total_scsslsteps) %>% 
+  ggplot(aes(x = steps, y = age_cat, fill = after_stat(x))) +
+  geom_density_ridges_gradient(scale = 3, quantile_lines = TRUE, quantiles = 2) +
+  scale_fill_viridis_c(option = "B", name = "") +
+  scale_x_continuous(limits=c(0,25000),
+                     labels = seq(0, 30, 5),
+                     breaks = seq(0, 30000, 5000)) +
+  scale_y_discrete(labels = c("<18", "18-29", "30-39", "40-49", "50-59", "60-69", "70+")) +
+  theme(legend.position = "none") + 
+  labs(x = "Average Daily Steps (x1000); Estimated by Self-Supervised Learner", y = "Age category") +
+  annotate(
+    geom = "label",
+    x = 15000,
+    y = 2,
+    label = "Median average steps <18 yrs: 9k",
+    hjust = 0,
+    color = "#444444"
+  )  +
+  annotate(geom = "segment",
+           x = 15000, xend = m_child, y = 2, yend = 2,
+    arrow = arrow(length = unit(0.1, "inches"), type = "closed"),
+    color = "white",
+    linewidth = .5
+  ) +
+  annotate(
+    geom = "label",
+    x = 8000,
+    y = 9,
+    label = "Median average steps 70+ yrs: 5k",
+    hjust = 0,
+    color = "#444444"
+  )  +
+  annotate(geom = "segment",
+           x = 8000, xend = m_old, y = 9, yend = 9,
+    arrow = arrow(length = unit(0.1, "inches"), type = "closed"),
+    color = "white",
+    linewidth = .5
+  )
+
+```
+
+::: {.notes}
+Quick summary of those results 
+Steps decrease with age (as expected)
+::: 
+
+---
+
+
+### Counting steps in NHANES 
+
+Steps are more predictive of mortality than age, sex, or BMI 
+
+```{r dose response}
+#| cache: true 
+
+dose_resp %>%
+  filter(stepvar == "total_scrfsteps") %>% 
+  ggplot(aes(x = steps, y = hr))+
+  geom_line(linewidth = 1) +
+  geom_ribbon(aes(ymin = lwr, ymax = upr), alpha = 0.5,
+  linewidth = 0) +
+  scale_y_continuous(trans = "log",
+                     labels = label_number(accuracy = 0.1)) +
+  scale_x_continuous(breaks=seq(2000, 20000, 2000), limits = c(2000, 20000),
+                     labels = seq(2, 20, 2)) +
+  geom_hline(aes(yintercept = 1), linetype = "dashed") +
+  labs(x = "Daily Steps (x1000); Estimated by Self-Supervised Learner", y = "Hazard Ratio (compared to 2000 steps/day)", title = "Steps and Mortality", subtitle = "Individuals aged 50 and older") +
+  theme(legend.position = "none") +
+  geom_rug(data = rug_dat, aes(x = value), sides = "b", color = "#D55E00", size = 0.5, alpha = 0.5) +
+  annotate(geom = "label", x = 8000, y = 2, label = "Significantly lower hazard of mortality\nfor 8k steps/day compared to 2k steps/day", hjust = 0) +
+  annotate(geom = "curve", x = 10000, xend = 8000, y = 1.6, yend = 0.9, curvature = -0.2,
+    arrow = arrow(length = unit(0.1, "inches"), type = "closed"),
+    color = "#444444",
+    linewidth = .5) +
+  annotate(geom = "label", x = 2000, y = 0.1, color = "#D55E00", label = "Mortality events", hjust = 0) 
+```
+
+<div style=" position: absolute; bottom: 0.5em; right: -4em; font-size: 0.7em; color: #777; "> @nhanes_steps </div>
+
+---
+
+### Sex differences in steps in NHANES 
+
+
+```{r sex diffs}
+#| cache: true 
+steps_summ %>% 
+  mutate(age_cat = factor(age_cat,labels = c("<18","18-29","30-39","40-49","50-59","60-69","70+"))) %>% 
+  ggplot(aes(x = ind, y = mean, color = gender)) + 
+  facet_grid(.~age_cat) + 
+  geom_smooth(se = FALSE) +
+  scale_color_manual(values = c("#CC79A7", "#56B4E9"), name = "") +
+  theme(legend.position = "bottom",
+        axis.text.x = element_text(size = 10))  +
+  labs(x = "Hour of the Day", y = "Steps per minute") +
+  scale_x_continuous(breaks = c(0, 6 * 60, 13 * 60, 20 * 60, 1440),
+                     labels = c("",  "6am",
+                                "1pm",  "8pm", "")) 
+
+
+
+```
+
+::: {.notes}
+We want to quantify this relationship - fit a model. Tool we have for that is FoSR. Where before we had function as predictor, it can also be an outcome. 
+:::
+
+---
+
+### Survey function on scalar regression: software 
+
+<div style="font-size: 2em;">
+```{r svfosr software}
+#| echo: true 
+#| eval: false 
+
+model_fit = svyfosr::svyfui(steps_mat ~ age + sex,
+                            weights = survey_weight,
+                            data = steps_df,
+                            family = gaussian(),
+                            boot_type = "BRR",
+                            num_boots = 500,
+                            parallel = TRUE,
+                            seed = 2213)
+
+```
+
+</div>
+![](figs/logo_new.png){width=25%}
+<div style=" position: absolute; bottom: 0.5em; right: -4em; font-size: 0.7em; color: #777; "> @svy_package </div>
+
+---
+
+### Sex differences in steps: complex survey function on scalar regression
+
+```{r steps application w ci}
+#| cache: true
+
+unwt = plt_df_boot[[3]]
+
+brr = plt_df_boot[[1]]
+
+df2 = 
+  unwt %>% mutate(model = "Unweighted") %>% 
+  bind_rows(brr %>% mutate(model = "Weighted")) %>% 
+  filter(name %in% c("(Intercept)", "sex_bin")) %>% 
+  mutate(name = factor(name, labels = c("Intercept", "Sex: Female")),
+         model = factor(model))
+
+p1 = df2 %>% 
+  ggplot(aes(x = s, y = beta)) +
+  facet_wrap(name ~ ., scales = "free_y") +
+  geom_line(aes(color = model), linewidth = 1.2)  +
+  geom_hline(
+    data = tibble(name = "Sex: Female"),
+    aes(yintercept = 0),
+    linetype = "dashed"
+  ) +
+  scale_x_continuous(breaks= c(60, seq(240, 1440, 4 * 60)), labels = c("01:00", "04:00", "08:00", "12:00", "16:00", "20:00", "24:00")) +
+  labs(x = "Hour of Day", y = "Steps per minute") +
+  scale_color_manual(values = c("#E69F00", "#009E73FF"), name = "Model") +
+  theme(legend.position = "bottom")
+
+p1 + 
+  geom_ribbon(aes(x = s, ymin = lower, ymax = upper, fill = model), alpha = .5) +
+  geom_line(aes(color = model), linewidth = 1.2)  +
+  scale_fill_manual(values = c("#E69F00", "#009E73FF"), name = "Model",
+                    labels = c("Unweighted", "BRR")) +
+  scale_color_manual(values = c("#E69F00", "#009E73FF"), name = "Model",
+                    labels = c("Unweighted", "BRR")) 
+  
+```
+
+<div style=" position: absolute; bottom: 0.5em; right: -4em; font-size: 0.7em; color: #777; "> @surveyfosr </div>
+
+----
+
+
+## Outline {.question-bullets}
+<div style="font-size: 115%;">
+
+- <span style="color:gray;">Can we identify someone from their walking pattern measured by a wrist-worn accelerometer? *(Digital fingerprinting)* </span>
+<br>
+<span style="color:gray;">$\rightarrow$ Yes! </span>
+- <span style="color:gray;"> Can we identify someone from their walking pattern measured by a wrist-worn accelerometer in big, free-living datasets? </span>
+<span style="color:gray;">$\rightarrow$ Yes! </span>
+<br>
+- <span style="color:gray;">What else can we learn from walking patterns in free-living data? </span>
+- Can we apply these methods to other high-density data sources? 
+</div>
+
+
+
+# Working with other high density data sources
+
+---
+
+### Hemodynamics and cardiac surgery 
+
+
+:::: {.columns}
+
+::: {.column width="60%"}
+![](figs/patient_setup.jpg)
+
+::: 
+
+::: {.column width="40%"}
+
+::: 
+
+::::
+
+---
+
+### Hemodynamics and cardiac surgery 
+
+
+:::: {.columns}
+
+::: {.column width="60%"}
+![](figs/patient_setup.jpg)
+
+::: 
+
+::: {.column width="40%"}
+<div style="font-size: 150%;">
+
++ Hemodynamics: how blood flows through your body
++ Modifiable risk factor for adverse outcomes after surgery, including acute kidney injury (AKI)
+
+</div>
+::: 
+
+::::
+
+
+
+---
+
+#### Hemodynamics and AKI 
+
+Time series for two different CABG patients
+
+```{r akiplt}
+#| cache: true 
+
+start_end_df =
+  hts %>% 
+  filter(id %in% c(aki_id, noaki_id) & cat_anes == "intra") %>% 
+  # mutate(val_CVP = if_else(cat_cpb == "intra", NA_real_, val_CVP)) %>% 
+  group_by(id) %>% 
+  mutate(start = min(time)) %>% 
+  mutate(time_elaps = as.numeric(difftime(time, start,
+                               units = "hours"))) %>% 
+  summarize(start = min(time_elaps[cat_cpb == "intra"]),
+            end = max(time_elaps[cat_cpb == "intra"])) %>% 
+  ungroup() %>% 
+  mutate(id2 = if_else(id == aki_id, "Developed AKI", "Did not develop AKI")) 
+
+hts %>% 
+  filter(id %in% c(aki_id, noaki_id) & cat_anes == "intra") %>% 
+  group_by(id) %>% 
+  mutate(start = min(time)) %>% 
+  ungroup() %>% 
+  mutate(time_elaps = as.numeric(difftime(time, start,
+                               units = "hours"))) %>% 
+  mutate(id2 = if_else(id == aki_id, "Developed AKI", "Did not develop AKI")) %>% 
+  pivot_longer(cols = c(val_MAP, val_CVP), names_to = "param", values_to = "value") %>% 
+  mutate(param = factor(param, labels = c("CVP", "MAP"))) %>% 
+  ggplot(aes(x = time_elaps, y = value, color = param)) + 
+  facet_grid(param ~ id2, scales = "free_y") +
+  labs(x = "Time since start of surgery (hours)", y = "Value (mmHg)") + 
+  scale_color_manual(values = c("#56B4E9", "#009E73")) +
+  theme(legend.position = "none") +
+  geom_vline(data = start_end_df, aes(xintercept = start), color = "#444444", linetype = "dashed") +
+  geom_vline(data = start_end_df, aes(xintercept = end), color = "#444444", linetype = "dashed") +
+  geom_step(linewidth = 1) +
+  geom_label(data = tibble(id2 = "Developed AKI", param = "MAP"),
+            aes(x =  (2.72 + 3.98)/2, y = 130, label = "Bypass period"), color = "#444444") +
+  geom_label(data = tibble(id2 = "Did not develop AKI", param = "MAP"),
+            aes(x = (3.28 + 5.4)/2, y = 130, label = "Bypass period"), color = "#444444") +
+  scale_x_continuous(breaks=seq(0, 7, 1)) 
+
+
+```
+
+<div style=" position: absolute; bottom: 0.5em; right: -4em; font-size: 0.7em; color: #777; "> @blood </div>
+
+::: {.notes}
++ Mean arterial pressure (MAP): average pressure pushing blood through vessels, important for organ perfusion
++ Central venous pressure (CVP): pressure of blood returning to heart 
+:::
+
+--- 
+
+#### Hemodynamics and AKI 
+
+```{r bivar plot}
+#| cache: true
+hemo_res %>%
+  ggplot(aes(
+    x = map_fct,
+    y = cvp_fct,
+    fill = estimate,
+    label = format(estimate, digits = 2, nsmall = 2)
+  )) +
+  geom_tile(color = "black") +
+  geom_text() +
+  scale_fill_binned(
+    guide = "colorsteps",
+    palette = function(x)
+      c(
+        "#5D82F0",
+        "#7897F2" ,
+        "#93ACF5" ,
+        "#AEC0F7",
+        "#C9D5FA",
+        "#E4EAFC",
+        "#FFFFFF"
+        ,
+        "#FFE1E1",
+        "#FFC3C3",
+        "#FFA6A6" ,
+        "#FF8888" ,
+        "#FF6B6B" ,
+        "#FF4D4D",
+        "#FF3030"
+      ),
+    breaks = c(
+      0.5,
+      0.6,
+      0.7,
+      0.8,
+      0.9,
+      0.97,
+      1.02,
+      1 / 0.9,
+      1 / 0.8,
+      1 / 0.7,
+      1 / 0.6,
+      1 / 0.5,
+      1 / 0.4,
+      round(max(hemo_res$estimate + .1), 1)
+    )) +
+  theme(legend.position = "none") +
+  labs(
+   x = "MAP Range (mmHg)",
+    y = "CVP Range (mmHg)",
+    title = "Odds Ratios of AKI",
+    subtitle = "Associated with spending 5 additional minutes in given range"
+  )
+  
+```
+
+
+---
+
+#### Hemodynamics and AKI 
+
+```{r shell plot}
+#| cache: true 
+g1 = "#AEC0F7"
+g2 = "#FFFFFF"
+g3 = "#FFE1E1"
+g4 = "#FFC3C3"
+g5 = "#FF8888"
+
+
+
+res_plot = 
+  multi_results_plt %>% 
+              select(group, pval, cut_MAP, cut_CVP, estimate) %>% 
+              rename(pval_multi = pval,
+                     estimate_multi = estimate) %>% 
+  mutate(estimate_multi2 = c(0.93, 1.01, 1.02, 1.03, 1.06)) %>% 
+    mutate(num = sub(".*group\\_", "", group),
+         group_lab = paste0("Zone ", num))
+
+plotdf %>%
+  mutate(num = sub(".*group\\_", "", group),
+         group_lab = glue::glue("Zone ", num)) %>% 
+  ggplot(aes(
+    x = cut_MAP,
+    y = cut_CVP,
+    fill = group
+  )) + geom_tile(col = "grey", linewidth = .5) +
+  labs(
+    x = "MAP Range (mmHg)",
+    y = "CVP Range (mmHg)",
+    fill = "Odds Ratio",
+    title = ""
+  ) +
+  scale_fill_manual(values = c(g1, g2, g3, g4, g5))+
+  theme(legend.position = "none")+
+  geom_label(data = res_plot, 
+             aes(x = cut_MAP, y = cut_CVP,
+          label = paste0(group_lab, "\n", "OR = ", estimate_multi2, "\n", pval_multi)),
+             col = "black", hjust = 0, size = 5) +
+  labs(title = "Odds Ratios of AKI",
+    subtitle = "Associated with spending 5 additional minutes in given zone")
+
+```
+
+<div style=" position: absolute; bottom: 0.5em; right: -4em; font-size: 0.7em; color: #777; "> @fine_mapping </div>
+
+::: {.notes}
+Take something "simple" - time series - and make more complex (image) 
+::: 
+
+----
+
+#### Hemodynamics and length of stay 
+
+```{r los}
+#| cache: true 
+# quartiles = quantile(df_surv$group_5, seq(0, 1, .25)); quartiles
+df_surv = 
+  df_surv %>% 
+  mutate(los = los / 24, 
+         lowmap_lowcvp_group = if_else(group_5 < 6, "<5 minutes", "5 or more minutes"))
+
+fit = survfit(Surv(los, event) ~ lowmap_lowcvp_group, data = df_surv)
+ggsurvplot(
+   fit,       
+   fun = "event",
+   xlab = "Time (days)",
+   ylab = "Hospital discharge probability",
+   xlim = c(0, 40),
+   palette = c("#009E73", "#CC79A7"),
+   break.time.by = 10,
+   data = df_surv,  # data used to fit survival curves. 
+   pval = TRUE,             # show p-value of log-rank test.
+   conf.int = TRUE,  
+   pval.coord = c(20, 0.5),
+   legend = "bottom",
+   legend.title = "Zone 5 Exposure Time",
+   legend.labs = c("Less than 5 minutes", "At least 5 minutes"),
+   ggtheme = theme_minimal()
+) 
+```
+
+---
+
+### Hemodynamics publications
+
++ Fine-Mapping the Association of Acute Kidney Injury With Mean Arterial and Central Venous Pressures During Coronary Artery Bypass Surgery [@fine_mapping]
++ Occurrence of Low Cardiac Index During Normotensive Periods in Cardiac Surgery: A Prospective Cohort Study Using Continuous Noninvasive Cardiac Output Monitoring [@ci]
++ Assessment of Renal Vein Stasis Index by Transesophageal Echocardiography During Cardiac Surgery: A Feasibility Study [@rvsi]
++ Assessment of Renal Vein Flow Index by Transesophageal Echocardiography: Precision, Variability, and Association with Cardiac Index During Cardiac Surgery [@rvsi2]
++ Low Cardiac Index During Periods of Hypotension and Risk of Acute Kidney Injury in Cardiac Surgery. Goeddel, Koffman et al. 2025. *Under review*
++ Hemodynamic zones of arterial and venous pressure determine risk of kidney injury in cardiac surgery. Goeddel, Zhou, Hernandez, Koffman et al. 2025. *Under review*
+
+
+::: {.notes}
+
+What else is transportable? 
+
+:::
+
+---- 
+
+### Arterial waveform 
+
+:::: {.columns}
+
+::: {.column width="50%"}
+
+![](figs/a_line.png){.equalheight}
+
+:::
+
+
+::: {.column width="50%"}
+
+
+![](figs/abp4.png){.equalheight}
+:::
+
+::::
+
+---
+
+### Arterial waveform 
+
+```{r abp 2 pts}
+#| cache: true 
+
+
+start = 5000
+p0 = 
+  hemo_data0 %>% 
+  mutate(floor_sec = floor(relative_time_sec)) %>% 
+  filter(floor_sec >= start & floor_sec < start + 10) %>% 
+  ggplot(aes(x = relative_time_sec, y = abp)) +
+  geom_line(linewidth = 1.1) +
+  scale_x_continuous(breaks = seq(start, start + 10, 1),
+                     labels = seq(0, 10, 1)) +
+  scale_y_continuous(limits=c(48, 120), breaks=seq(50,120,10)) +
+  labs(x = "Time (s)", y = "Arterial Blood Pressure (mmHg)",
+       title = "10s of Arterial Waveform", 
+       subtitle = "Patient 1")
+
+p1 = 
+  hemo_data %>% 
+  mutate(floor_sec = floor(relative_time_sec)) %>% 
+  filter(floor_sec >= start & floor_sec < start + 10) %>% 
+  ggplot(aes(x = relative_time_sec, y = abp)) +
+  geom_line(linewidth = 1.1) +
+  scale_x_continuous(breaks = seq(start, start + 10, 1),
+                     labels = seq(0, 10, 1)) +
+    scale_y_continuous(limits=c(48, 120), breaks=seq(50,120,10)) +
+  labs(x = "Time (s)", y = "Arterial Blood Pressure (mmHg)",
+       title = "10s of Arterial Waveform", 
+       subtitle = "Patient 2")
+
+p0 + p1
+```
+
+---
+
+### Fingerprinting with arterial waveform
+
+```{r fprint waveform1}
+#| cache: true
+x = hemo_data %>%
+  filter(cat_cpb %in% c("pre", "post") & cat_anes == "intra") %>%
+  mutate(time = floor_date(time, unit = "seconds"))
+
+seconds = unique(x$time)
+set.seed(123)
+sec_sample = sample(seconds, 10 * 60, replace = FALSE)
+dens_df =
+ x %>% 
+ filter(time %in% sec_sample) %>% 
+ mutate(cat_cpb = factor(cat_cpb, labels = c("Post-CPB", "Pre-CPB")),
+        cat_cpb = forcats::fct_rev(cat_cpb)) %>% 
+ group_by(time, cat_cpb) %>%
+ mutate(lag_abp = lag(abp, n = 18)) %>%
+ ungroup()  %>%
+ drop_na()
+
+dens_df$density = get_density(dens_df$abp, dens_df$lag_abp, n = 120 - 18)
+  
+dens_df2 =
+ x %>% 
+ filter(time %in% sec_sample) %>% 
+ mutate(cat_cpb = factor(cat_cpb, labels = c("Post-CPB", "Pre-CPB")),
+        cat_cpb = forcats::fct_rev(cat_cpb)) %>% 
+ group_by(time, cat_cpb) %>%
+ mutate(lag_abp = lag(abp, n = 36)) %>%
+ ungroup()  %>%
+ drop_na()
+
+dens_df2$density = get_density(dens_df2$abp, dens_df2$lag_abp, n = 120 - 36)
+
+dens_df3 =
+ x %>% 
+ filter(time %in% sec_sample) %>% 
+ mutate(cat_cpb = factor(cat_cpb, labels = c("Post-CPB", "Pre-CPB")),
+        cat_cpb = forcats::fct_rev(cat_cpb)) %>% 
+ group_by(time, cat_cpb) %>%
+ mutate(lag_abp = lag(abp, n = 54)) %>%
+ ungroup()  %>%
+ drop_na()
+
+dens_df3$density = get_density(dens_df3$abp, dens_df3$lag_abp, n = 120 - 54)
+  
+pt1 = dens_df %>% 
+  mutate(lag = "Lag = 0.15s") %>% 
+  bind_rows(dens_df2 %>% mutate(lag = "Lag = 0.30s")) %>% 
+  bind_rows(dens_df3 %>% mutate(lag = "Lag = 0.45s")) %>% 
+  ggplot(aes(x=abp, y = lag_abp, group = time, color = density)) +
+  facet_grid(lag~.) +
+  geom_point(size = .5, alpha = .1) +
+  scale_color_viridis(name = "Density", option = "B") +
+  labs(x = "ABP (mmHg)", y = "Lag ABP (mmHg)", title = "Fingerprint",  subtitle = "Patient 1") +
+  scale_x_continuous(limits = c(40,150)) +
+  scale_y_continuous(limits = c(40,150)) 
+  
+```
+
+
+
+```{r fprint waveform2}
+#| cache: true
+x = hemo_data0 %>%
+  filter(cat_cpb %in% c("pre", "post") & cat_anes == "intra") %>%
+  mutate(time = floor_date(time, unit = "seconds"))
+
+seconds = unique(x$time)
+set.seed(123)
+sec_sample = sample(seconds, 10 * 60, replace = FALSE)
+dens_df =
+ x %>% 
+ filter(time %in% sec_sample) %>% 
+ mutate(cat_cpb = factor(cat_cpb, labels = c("Post-CPB", "Pre-CPB")),
+        cat_cpb = forcats::fct_rev(cat_cpb)) %>% 
+ group_by(time, cat_cpb) %>%
+ mutate(lag_abp = lag(abp, n = 18)) %>%
+ ungroup()  %>%
+ drop_na()
+
+dens_df$density = get_density(dens_df$abp, dens_df$lag_abp, n = 120 - 18)
+  
+dens_df2 =
+ x %>% 
+ filter(time %in% sec_sample) %>% 
+ mutate(cat_cpb = factor(cat_cpb, labels = c("Post-CPB", "Pre-CPB")),
+        cat_cpb = forcats::fct_rev(cat_cpb)) %>% 
+ group_by(time, cat_cpb) %>%
+ mutate(lag_abp = lag(abp, n = 36)) %>%
+ ungroup()  %>%
+ drop_na()
+
+dens_df2$density = get_density(dens_df2$abp, dens_df2$lag_abp, n = 120 - 36)
+
+dens_df3 =
+ x %>% 
+ filter(time %in% sec_sample) %>% 
+ mutate(cat_cpb = factor(cat_cpb, labels = c("Post-CPB", "Pre-CPB")),
+        cat_cpb = forcats::fct_rev(cat_cpb)) %>% 
+ group_by(time, cat_cpb) %>%
+ mutate(lag_abp = lag(abp, n = 54)) %>%
+ ungroup()  %>%
+ drop_na()
+
+dens_df3$density = get_density(dens_df3$abp, dens_df3$lag_abp, n = 120 - 54)
+  
+pt2 = dens_df %>% 
+  mutate(lag = "Lag = 0.15s") %>% 
+  bind_rows(dens_df2 %>% mutate(lag = "Lag = 0.30s")) %>% 
+  bind_rows(dens_df3 %>% mutate(lag = "Lag = 0.45s")) %>% 
+  ggplot(aes(x=abp, y = lag_abp, group = time, color = density)) +
+  facet_grid(lag~.) +
+  geom_point(size = .5, alpha = .1) +
+  scale_color_viridis(name = "Density", option = "B") +
+  labs(x = "ABP (mmHg)", y = "Lag ABP (mmHg)", title = "Fingerprint",  subtitle = "Patient 2") +
+  scale_x_continuous(limits = c(40, 150)) +
+  scale_y_continuous(limits = c(40, 150))
+
+pt1 + pt2
+  
+```
+
+---
+
+
+### Fingerprinting with arterial waveform
+
+```{r xgb accuracy}
+#| cache: true
+mean_preds %>% 
+  mutate(correct = 
+           if_else(true_subject == model & true_subject %in% correct$true_subject, 1, 0)) %>% 
+  ggplot(aes(x = factor(true_subject), y = mean_pred, color = factor(correct))) + 
+  geom_jitter(width = .1, size = .75, alpha = 0.5) +
+  theme(legend.position = "bottom",
+        axis.text.x = element_blank(),
+        panel.grid.major.x = element_blank(),
+        panel.grid.minor.x = element_blank(),
+        legend.text = element_text(size = 14),
+        legend.title = element_text(size = 15)) +
+  scale_color_manual(values = c("#CC79A7", "#009E73"),
+                     labels = c("Models trained for other patients", "Model trained for correct patient"),
+                     name = "Prediction from:") + 
+  labs(x = "Patient", y = "Predicted Probability",
+       title = "Predicted Probabilities from XGBoost Model",
+       subtitle = "94% rank-1, 99% rank-5 accuracy on test set") +
+  guides(color = guide_legend(override.aes = list(size = 4, alpha = 1))) +
+  scale_y_continuous(breaks = seq(0, 0.7, 0.1)) +
+  annotate(geom = "text",
+           color = "#444444",
+           hjust = 0,
+           label = "Green point above pink points in each column\nindicates correct identification",
+           x = "325", y = 0.59) +
+  geom_segment(xend = "272", x = "325", y = 0.6, yend = 0.6,
+    arrow = arrow(length = unit(0.1, "inches"), type = "closed"),
+    color = "#444444",
+    linewidth = .5)
+
+
+```
+
+---
+
+## Future Directions 
+<div style="font-size: 150%;">
+
+::: {.incremental}
++ Changes in fingerprint to predict changes in function
++ Extending survey function on scalar regression to longitudinal outcomes 
++ Standardizing processing and analysis pipelines for wearable accelerometry 
++ Real-time prediction models for adverse outcomes during surgery
+
+:::
+
+</div>
+
+---
+
+## Thank you!
+
+<br>
+<div style="font-size: 150%;">
+
+- Link to slides: [tinyurl.com/koff-wfu](tinyurl.com/koff-wfu) 
+- Email: [lkoffma2@jh.edu](lkoffma2@jh.edu)
+- Website: [lilykoff.com](lilykoff.com)
+- Github: [github.com/lilykoff](github.com/lilykoff)
+</div>
+<br>
+
+![](figs/koff-wfu-qr.png){width=150%}
+
+---
+
+## References
+
+::: {#refs}
+:::
+
+# Appendix 
+
+---
+
+### Step counting validation: identifying walking in free-living datasets
+
+
++ **Search** for free-living datasets with wrist-worn accelerometry and gold standard step counts
+  + Free-living $\neq$ lab
++ **Implement** open-source algorithms for step counting from wrist accelerometry
++ **Evaluate** performance of algorithms 
+
+![Capturing gold standard steps in one [dataset](https://cecas.clemson.edu/~ahoover/pedometer/)](figs/data-rec.png){fig-align="left"}
+
+
+
+---
+
+### Step counting validation: identifying walking in free-living datasets
+
+Open-source algorithms and 3 datasets with gold-standard step counts 
+
+```{r algo compare}
+#| cache: true
+
+median_df = 
+  step_acc %>% 
+  filter(cat_activity %in% c("clemson_overall", "oxwalk100", "marea")) %>% 
+  filter(algorithm %in% c("steps_scrf_30", "steps_scssl_30", "steps_vsrres_30", "steps_oak_30")) %>% 
+  mutate(algorithm = fct_reorder(algorithm, ape, median)) %>% 
+  group_by(algorithm) %>% 
+  summarize(med = median(ape), .groups = "drop")
+
+
+step_acc %>% 
+  filter(cat_activity %in% c("clemson_overall", "oxwalk100", "marea")) %>% 
+  filter(algorithm %in% c("steps_scrf_30", "steps_scssl_30", "steps_vsrres_30", "steps_oak_30")) %>% 
+  mutate(algorithm = fct_reorder(algorithm, ape, median)) %>% 
+  ggplot(aes(x = algorithm, y = ape, fill = algorithm)) + 
+  geom_boxplot(color = "black")  +
+  scale_fill_manual(values =c( "#E69F00", "#56B4E9", "#009E73", "#CC79A7")) +
+  theme(legend.position = "none") + 
+  scale_x_discrete(labels = c("Self-Supervised Learner +\nPeak Finding", "Random Forest +\nPeak Finding", "Frequency Domain", "Peak Finding with\n Thresholds")) +
+  labs(x = "Algorithm Type", y = "Absolute Percent Error", title = "Step Count Accuracy Across Algorithms") +
+  annotate(geom = "segment",
+           x = 0.65, xend = 0.65, y = 75, yend = 45,
+    arrow = arrow(length = unit(0.1, "inches"), type = "closed"),
+    color = "#5CB85C",
+    linewidth = 1.1
+  ) +
+  annotate(geom = "label", 
+           x = 0.65, y = 45, label = "Lower = better", angle = 90,
+           vjust = -1, hjust = 0) +
+  scale_y_continuous(limits=c(0, 75), breaks = seq(0,75,15)) +
+  geom_label(data = median_df, 
+             aes(x = algorithm, y = med, label = round(med)))
+
+```
+
+<div style=" position: absolute; bottom: 0.5em; right: -4em; font-size: 0.7em; color: #777; "> @Koffman2024_steps </div>
+
+---
+
+### Step counting application: idenfiying walking and counting steps in NHANES 
+
+Do estimates differ by algorithm?
+
+```{r ridges2}
+#| cache: true 
+
+mdf = 
+  xdf %>% 
+  select(age_cat, total_scrfsteps, total_scsslsteps,
+         total_vsrevsteps, total_oaksteps) %>% 
+  filter(age_cat %in% c("(17,29]", "(69,Inf]")) %>% 
+  mutate(age_cat = factor(age_cat, levels = c("(17,29]", "(69,Inf]"), 
+                          labels = c("Age: 18-29", "Age: 70+"))) %>% 
+  group_by(age_cat) %>% 
+  summarize(across(contains("steps"), median))
+
+ann_text = tibble(x = c(0, 0), y = c(1, 1),
+                  age_cat = c("Age: 18-29", "Age: 70+"),
+                  lab = c("Range in medians: 8.5k to 12.5k",
+                          "Range in medians: 3.6k to 5.8k"))
+
+xdf %>% 
+  select(age_cat, total_scrfsteps, total_scsslsteps,
+         total_vsrevsteps, total_oaksteps) %>% 
+  filter(age_cat %in% c("(17,29]", "(69,Inf]")) %>% 
+  mutate(age_cat = factor(age_cat, levels = c("(17,29]", "(69,Inf]"), 
+                          labels = c("Age: 18-29", "Age: 70+"))) %>% 
+  pivot_longer(cols = -age_cat,
+               names_to = "algorithm",
+               values_to = "steps") %>% 
+  mutate(algorithm = factor(algorithm, levels = c("total_scsslsteps", "total_scrfsteps", "total_oaksteps", "total_vsrevsteps"))) %>% 
+  ggplot(aes(x = steps, y = algorithm, fill = algorithm, color = algorithm)) +
+  geom_density_ridges(scale = 2, quantile_lines = TRUE, quantiles = 2, alpha = 0.75) +
+  facet_grid(.~age_cat) +
+  scale_fill_manual(values =c( "#E69F00", "#56B4E9", "#009E73", "#CC79A7")) +
+  scale_color_manual(values =c( "#E69F00", "#56B4E9", "#009E73", "#CC79A7")) +
+  scale_x_continuous(limits=c(0,25000),
+                     labels = seq(0, 30, 5),
+                     breaks = seq(0, 30000, 5000))  +
+  scale_y_discrete(labels = c("Self-Supervised Learner +\nPeak Finding", "Random Forest +\nPeak Finding", "Frequency Domain", "Peak Finding with\n Thresholds")) +
+  labs(x = "Average Daily Steps (x1000)", y = "",
+       title = "Step Distributions by Algorithm and Age",
+       subtitle = "Median steps can differ by over 30% between algorithms") +
+  theme(legend.position = "none") +
+  geom_label(data = ann_text, 
+            aes(x = x, y = y, label = lab),
+    color = "#444444", inherit.aes = FALSE,
+    hjust = 0, vjust = 1
+  )
+
+```
+
+---
+
+### Function on scalar regression 
+
+<div style="font-size: 115%;">
+
+::: {.incremental}
++ Outcome: steps profile over the course of the day (function) 
+
++ Predictors: age, sex (scalars)
+
++ Model: $$\mathbb{E}[\mathrm{steps}_i(s)] = \beta_0(s) + \beta_1(s)\mathbb{I}\{\mathrm{sex}_i=\mathrm{female}\} + \beta_2(s)(\mathrm{age}_i-50) $$ 
+$i$: participant; 
+$s \in \{1, \dots, 1440\}$: each minute of the day
+
++ **Interpretation**
+  + $\beta_0(s)$: expected steps for reference sex category and age 50
+  + $\beta_1(s)$: change in steps for females compared to males, holding age constant 
+  + Can be interpreted at specific points of the day (e.g., how many more steps do males take at 12pm?) 
+
+</div>
+:::
+
+---
+
+### Function on scalar regression: implementation 
+::: {.incremental}
+
+<div style="font-size: 95%;">
++ Fast univariate inference (FUI) [@Cui2021]
+
++ Fit separate (univariate) GLM at each point $s$, smooth the resulting point estimates 
+
++ Bootstrap subjects to get confidence bands 
+
+</div>
+
+:::
+
+---
+
+### Function on scalar regression: implementation 
+
+<div style="font-size: 95%;">
+
++ Fast univariate inference (FUI) [@Cui2021]
+
++ Fit separate (univariate) GLM at each point $s$, smooth the resulting point estimates 
+
++ Bootstrap subjects to get confidence bands 
+
++ <span style="color:red;">BUT: NHANES is not a simple random sample</span>
+
+![](figs/sample_design.gif)
+
+
++ Individuals sampled in geographic clusters, minority groups oversampled 
+
++ Are estimates valid for population-level inference? 
+
+</div>
+
+<div style=" position: absolute; bottom: 0em; right: -4em; font-size: 0.6em; color: #777; "> [NHANES Sample Design Tutorial](https://wwwn.cdc.gov/nchs/nhanes/tutorials/sampledesign.aspx) </div>
+
+
+---
+
+
+### Survey function on scalar regression 
+
+<div style="font-size: 135%;">
+
+
+::: {.incremental}
+
++ **No** method exists for survey-weighted function on scalar regression 
+
++ Standard regression, well developed methods and software to take into accounts weights and correlation between clusters (e.g. $\texttt{svyglm}$, $\texttt{svycoxph}$) [@surveys]
+
+
++ FUI built on separate GLMS
+
++ **Idea**: incorporate survey weights into the GLMs and use survey-aware replication/bootstrap methods for inference 
+
+:::
+
+</div>
+
+---
+
+### Survey function on scalar regression: simulation 
+::: {.incremental}
+**First** simulation study to evaluate function on scalar regression in complex survey settings 
+
++ **Generate** superpopulation 
+  + Each individual has functional outcome and covariate
+  + Individuals belong to clusters (geographic areas)
+  + Functional outcomes correlated within clusters
++ **Sample** from superpopulation in each iteration of simulation
+  + Selection probability related to functional outcome (informative sampling)
++ **Compare**: 
+  + Unweighted model w/ standard bootstrap
+  + Weighted models with weighted bootstrap 
+  + Weighted models with complex survey bootstrap (2)
++ **Evaluate**:   
+  + Bias in coefficient estimation 
+  + Coverage of confidence intervals 
+
+::: 
+
+---
+
+
+
+### Survey function on scalar regression: simulation
+
+```{r survey sim res}
+#| cache: true 
+p1 = res_g %>% 
+  filter(boot_type != "RWYB") %>%
+  mutate(boot_type = if_else(boot_type == "BRR", "BRR*", boot_type)) %>% 
+  mutate(boot_type = factor(boot_type, levels = c("Unweighted", "Weighted", "BRR*"))) %>% 
+  ggplot(aes(x= boot_type, y = lMISE, color = boot_type, fill = boot_type))+
+  facet_wrap(. ~ var) +
+  geom_boxplot(
+    box.colour = "black",
+    median.color = "black",
+    median.linewidth = .9,
+    staplewidth = 0.5, # show staple
+    outlier.size = 0.5,
+    outlier.alpha = 0.5,
+  ) +
+  stat_summary(fun = mean,
+               geom = "point",
+               color = "black",
+               aes(shape = boot_type),
+               size = 2,
+               position = position_dodge(width = 0.75)) +
+  theme(palette.color.discrete = c("#E69F00", "#56B4E9", "#009E73FF")) +
+  theme_sub_legend(position = "none") +
+  theme_sub_panel(grid.major.x = element_blank(),
+                  grid.minor.x = element_blank()) +
+  theme_sub_axis_x(text = element_text(angle = 20)) + 
+  labs(x = "Estimation Type", y = expression(log[10]~"Mean Integrated Squared Error"), color = "Estimation Type", fill = "Estimation Type", shape = "Estimation Type", title = "Bias") +
+  scale_shape_manual(values = c(1, 8, 5))
+
+p2 = res_g %>% 
+  filter(boot_type != "RWYB") %>% 
+  mutate(boot_type = if_else(boot_type == "BRR", "BRR*", boot_type)) %>% 
+  mutate(boot_type = factor(boot_type, levels = c("Unweighted", "Weighted", "BRR*"))) %>% 
+  ggplot(aes(x= boot_type, y = cover_pw, color = boot_type, fill = boot_type))+
+  geom_boxplot(
+    box.colour = "black",
+    median.color = "black",
+    median.linewidth = .9,
+    staplewidth = 0.5, # show staple
+    outlier.size = 0.5,
+    outlier.alpha = 0.5,
+  ) +
+  facet_wrap(. ~ var) +
+  stat_summary(fun = mean,
+               geom = "point",
+               color = "black",
+               aes(shape = boot_type),
+               size = 2,
+               position = position_dodge(width = 0.75)) +
+  theme(palette.color.discrete = c("#E69F00", "#56B4E9", "#009E73FF")) +
+  theme_sub_legend(position = "none") +
+  theme_sub_axis_x(text = element_text(angle = 20)) + 
+  theme_sub_panel(grid.major.x = element_blank(),
+                  grid.minor.x = element_blank()) +
+  labs(x = "Inference Type", y = "Pointwise Coverage", color = "Estimation Type", fill = "Estimation Type", shape = "Estimation Type", title = "Coverage") +
+  scale_shape_manual(values = c(1, 8, 5)) +
+  scale_y_continuous(breaks=c(0, .25, .5, .75, .95, 1)) +
+  geom_hline(aes(yintercept = .95), color = "#CC79A7", linetype = "dashed")
+
+# p1 + p2 + plot_layout(widths = c(.7, 1)) + plot_annotation(caption = "*Balanced Repeated Replication: bootstrap method that accounts for within- stratum correlation")
+p1 + p2 + plot_annotation(caption = "*Balanced Repeated Replication: bootstrap method that accounts for within- stratum correlation")
+
+```
+
+<div style=" position: absolute; bottom: 0.5em; right: -4em; font-size: 0.7em; color: #777; "> @surveyfosr </div>
+
+---
+
+
+
+
+### Survey function on scalar regression: application
+
+```{r steps application}
+#| cache: true
+unwt = plt_df_boot[[3]]
+
+brr = plt_df_boot[[1]]
+
+df2 = 
+  unwt %>% mutate(model = "Unweighted") %>% 
+  bind_rows(brr %>% mutate(model = "Weighted")) %>% 
+  filter(name %in% c("(Intercept)", "sex_bin")) %>% 
+  mutate(name = factor(name, labels = c("Intercept", "Sex: Female")),
+         model = factor(model))
+
+p1 = df2 %>% 
+  ggplot(aes(x = s, y = beta)) +
+  facet_wrap(name ~ ., scales = "free_y") +
+  geom_line(aes(color = model), linewidth = 1.2)  +
+  geom_hline(
+    data = tibble(name = "Sex: Female"),
+    aes(yintercept = 0),
+    linetype = "dashed"
+  ) +
+  scale_x_continuous(breaks= c(60, seq(240, 1440, 4 * 60)), labels = c("01:00", "04:00", "08:00", "12:00", "16:00", "20:00", "24:00")) +
+  labs(x = "Hour of Day", y = "Steps per minute") +
+  scale_color_manual(values = c("#E69F00", "#009E73FF"), name = "Model") +
+  theme(legend.position = "bottom")
+p1
+```
+
+
+
