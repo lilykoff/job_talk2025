@@ -405,6 +405,7 @@ dd99 =
 
 dd99$density = get_density(dd99$vm, dd99$lag_vm, n = 100)
 
+### --- extra hemodynamics ---- # 
 hts = read_rds(here::here("docs", "data", "hemo_timeseries_interp_post_exclusion.rds")) %>% 
   as_tibble() 
 
