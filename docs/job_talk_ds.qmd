@@ -69,6 +69,87 @@ get_density = function(x, y, ...) {
   return(dens$z[ii])
 }
 
+plot_fpca = function(fpca_res, num_eigen = 4, n_plt = 10, seed = 213, pve = FALSE) {
+  ncol = dim(fpca_res$Yhat)[2]
+  # loop over eigenfunctions
+  
+  if (pve){
+    total_pve = fpca_res$pve
+    pve_vec = 100 * ((fpca_res$evalues / sum(fpca_res$evalues)) * total_pve)
+  }
+  get_mean_curves = function(k){
+    q_k = quantile(fpca_res$scores[,k],c(0.1,0.9))
+    # get indices associated with low/high scores
+    inx_low_k = which(fpca_res$scores[,k] <= q_k[1])
+    inx_high_k = which(fpca_res$scores[,k] > q_k[2])
+    # get the average curves in each quantile: 0-.1, .9-1
+    mu_low_k = colMeans(fpca_res$Yhat[inx_low_k,]) %>%
+      as_tibble() %>%
+      mutate(sind = row_number(),
+             quantile = "low")
+    mu_high_k = colMeans(fpca_res$Yhat[inx_high_k,]) %>%
+      as_tibble() %>%
+      mutate(sind = row_number(),
+             quantile = "high")
+    if (pve) {
+      return(bind_rows(mu_low_k, mu_high_k) %>%
+               mutate(pc = glue::glue("PC ", k, ": ", {round(pve_vec[k], 0)}, "% variance expl.")))
+                        
+    } else{
+      return(
+        bind_rows(mu_low_k, mu_high_k) %>%
+            mutate(pc = paste0("PC: ", k)))
+    }
+  }
+
+  get_indiv_curves = function(k, n_plt) {
+    q_k = quantile(fpca_res$scores[,k],c(0.1,0.9))
+    # get indices associated with low/high scores
+    inx_low_k = which(fpca_res$scores[,k] <= q_k[1])
+    inx_high_k = which(fpca_res$scores[,k] > q_k[2])
+    mu_low_df =
+      fpca_res$Yhat[sample(inx_low_k, size=n_plt),] %>%
+      t() %>%
+      as_tibble() %>%
+      mutate(sind = row_number()) %>%
+      pivot_longer(cols = -sind, names_to = "id", values_to = "value", cols_vary  = "slowest", names_transform = ~sub(".*V", "", .x)) %>%
+      mutate(quantile = "low")
+    mu_high_df =
+      fpca_res$Yhat[sample(inx_high_k, size=n_plt),] %>%
+      t() %>%
+      as_tibble() %>%
+      mutate(sind = row_number()) %>%
+      pivot_longer(cols = -sind, names_to = "id", values_to = "value", cols_vary  = "slowest", names_transform = ~sub(".*V", "", .x)) %>%
+      mutate(quantile = "high")
+
+    if (pve) {
+      return(bind_rows(mu_low_df, mu_high_df) %>%
+               mutate(pc = glue::glue("PC ", k, ": ", {round(pve_vec[k], 0)}, "% variance expl.")))
+    } else {
+      return(bind_rows(mu_low_df, mu_high_df) %>%
+               mutate(pc = paste0("PC: ", k)))
+    }
+
+  }
+  df_mu = map_dfr(.x = 1:num_eigen, .f = get_mean_curves)
+  set.seed(seed)
+  df_ind = map_dfr(.x = 1:num_eigen, .f = get_indiv_curves, n_plt = n_plt)
+  list(df_mu = df_mu, df_ind = df_ind)
+
+  p = df_ind %>%
+    mutate(id = factor(id),
+           id_q = paste0(id, "_", quantile)) %>%
+    ggplot() +
+    geom_line(aes(x = sind, y = value, group = id_q, color = quantile), alpha=0.25) +
+    facet_wrap(~ pc, ncol = 3) +
+    labs(x = "Time (sec)", y = "Arterial Blood Pressure (mmHg)") +
+    geom_line(data = df_mu,
+              aes(x = sind, y = value, group = quantile, color = quantile),
+              linewidth = 1.1)
+
+  return(p)
+}
+
 ```
 
 ```{r ggplot theme}
@@ -328,6 +409,18 @@ dens_res6 = map_dfr(.x = seq(5, 99, 10),
   mutate(lag = lag / 100) %>% 
   mutate(across(c(vm, lag_vm), ~if_else(.x > 3 | .x < 0, NA, .x)))
 
+dens_res7 = map_dfr(.x = seq(5, 99, 10),
+                   .f = get_dens,
+                   id = 4) %>% 
+  mutate(lag = lag / 100) %>% 
+  mutate(across(c(vm, lag_vm), ~if_else(.x > 3 | .x < 0, NA, .x)))
+
+
+dens_res8 = map_dfr(.x = seq(5, 99, 10),
+                   .f = get_dens,
+                   id = 12) %>% 
+  mutate(lag = lag / 100) %>% 
+  mutate(across(c(vm, lag_vm), ~if_else(.x > 3 | .x < 0, NA, .x)))
 
 get_dens2 = function(lag_tmp){
   dd =
@@ -518,7 +611,11 @@ hemo_res = read_rds(here::here("docs", "data", "bricks_regressions.rds")) %>%
                                      "(6,8]", "(8,10]", "(10,12]",
                                      "(12,14]", "(14,16]", "(16,18]", "(18,20]")))
 
-
+#### heart beat fpca ### 
+beats_small = read_rds(here::here("docs", "data", "aligned_beats_sample.rds"))
+fpca1 = read_rds(here::here("docs", "data", "fpca_res_1.rds"))
+fpca2 = read_rds(here::here("docs", "data", "fpca_res_2.rds"))
+fpca_res_all = read_rds(here::here("docs", "data", "fpca_res_allbeats.rds"))
 ```
 
 
@@ -702,7 +799,7 @@ label_df =
   filter(time == 25) %>% 
   mutate(signal_lw = 2.5)
 
-p1 =
+p11 =
   s1 %>% 
   filter(ID2 %in% c(2, 4, 6)) %>% 
   filter(time >= 20 & time < 30) %>% 
@@ -788,7 +885,7 @@ p_empty =
 
 
 # p1 + p_empty + plot_layout(widths = c(1, 1))
-plot_grid(p1, p_empty, ncol = 2, align = "v", rel_widths = c(1,1))
+plot_grid(p11, p_empty, ncol = 2, align = "v", rel_widths = c(1,1))
 
 ```
 
@@ -808,7 +905,7 @@ Let's make this more concrete....
 #| cache: true
 # p1 + p2 + plot_layout(widths = c(1, 1))
 
-plot_grid(p1, p2, ncol = 2, align = "v", rel_widths = c(1,1))
+plot_grid(p11, p2, ncol = 2, align = "v", rel_widths = c(1,1))
 
 ```
 
@@ -821,7 +918,7 @@ Engage audience
 ### Problem setup 
 
 ```{r fingerprint answer}
-plot_grid(p1, p3, ncol = 2, align = "v", rel_widths = c(1,1))
+plot_grid(p11, p3, ncol = 2, align = "v", rel_widths = c(1,1))
 ```
 
 
@@ -970,7 +1067,7 @@ p2a = arrow_plot + p2 + plot_layout(widths = c(0.1, 0.9))
 # plot_grid(p1, p2a, ncol = 2, align = "v", rel_widths = c(1,1))
 # plot_grid(p1, p2b, ncol = 2, align = "v", rel_widths = c(1,1))
 
-plot_grid(p1, p2b, NULL, ncol = 3, align = "v", rel_widths = c(1, 1, 1))
+plot_grid(p11, p2b, p_empty, ncol = 3, align = "v", rel_widths = c(1, 1, 1))
 
 
 ```
@@ -982,7 +1079,7 @@ plot_grid(p1, p2b, NULL, ncol = 3, align = "v", rel_widths = c(1, 1, 1))
 
 ```{r print arrow x 2}
 
-plot_grid(p1, p2b, p2a, ncol = 3, align = "v", rel_widths = c(1, 1, 1))
+plot_grid(p11, p2b, p2a, ncol = 3, align = "v", rel_widths = c(1, 1, 1))
 ```
 
 ---
@@ -2126,11 +2223,171 @@ Each column has n points, one point per model, point corresponding to the model 
 
 ---
 
-### Why not use all possible lags? 
+### Why not use image as predictor directly?
+
+```{r use image 1}
+plot_grid(p11, p2b, p_empty, ncol = 3, align = "v", rel_widths = c(1, 1, 1))
+```
 
 ---
 
-### Why not use all possible lags? 
+### Why not use image as predictor directly?
+
+:::: {.columns}
+
+::: {.column width="50%"}
+
+
+```{r s41}
+#| fig-width: 6
+#| fig-height: 5
+#| cache: true
+#| out-width: "100%"
+
+plot_ly(
+  dens_res,
+  x = ~vm,
+  y = ~lag_vm,
+  z = ~lag,
+  color = ~density,
+  colors = viridis::viridis(100, option = "B"),
+  type = "scatter3d",
+  mode = "markers",
+  marker = list(size = 1, opacity = 0.5) 
+) %>%
+  colorbar(title = "Density") %>%
+  layout(
+    title = list(text = "Predictor for person A", y = 0.95),
+    # INCREASE margins here to prevent label clipping
+    margin = list(l = 80, r = 80, b = 80, t = 0), 
+    scene = list(
+      xaxis = list(title = "Acceleration (g)"),
+      yaxis = list(title = "Lag Acceleration (g)"),
+      zaxis = list(title = "Lag (s)")
+      # Optional: Adjust camera to zoom out slightly if labels still clip
+      # camera = list(eye = list(x = 1.5, y = 1.5, z = 1.5))
+    )
+  )
+
+
+```
+
+
+
+
+```{r s42}
+#| fig-width: 6
+#| fig-height: 5
+#| cache: true
+#| out-width: "100%"
+
+plot_ly(
+  dens_res6,
+  x = ~vm,
+  y = ~lag_vm,
+  z = ~lag,
+  color = ~density,
+  colors = viridis::viridis(100, option = "B"),
+  type = "scatter3d",
+  mode = "markers",
+  marker = list(size = 1, opacity = 0.5) 
+) %>%
+  colorbar(title = "Density") %>%
+  layout(
+    title = list(text = "Predictor for person B", y = 0.95),
+    # INCREASE margins here to prevent label clipping
+    margin = list(l = 80, r = 80, b = 80, t = 0), 
+    scene = list(
+      xaxis = list(title = "Acceleration (g)"),
+      yaxis = list(title = "Lag Acceleration (g)"),
+      zaxis = list(title = "Lag (s)")
+      # Optional: Adjust camera to zoom out slightly if labels still clip
+      # camera = list(eye = list(x = 1.5, y = 1.5, z = 1.5))
+    )
+  )
+
+
+```
+
+:::
+
+::: {.column width="50%"}
+
+```{r s43}
+#| fig-width: 6
+#| fig-height: 5
+#| cache: true
+#| out-width: "100%"
+
+plot_ly(
+  dens_res7,
+  x = ~vm,
+  y = ~lag_vm,
+  z = ~lag,
+  color = ~density,
+  colors = viridis::viridis(100, option = "B"),
+  type = "scatter3d",
+  mode = "markers",
+  marker = list(size = 1, opacity = 0.5) 
+) %>%
+  colorbar(title = "Density") %>%
+  layout(
+    title = list(text = "Predictor for person C", y = 0.95),
+    # INCREASE margins here to prevent label clipping
+    margin = list(l = 80, r = 80, b = 80, t = 0), 
+    scene = list(
+      xaxis = list(title = "Acceleration (g)"),
+      yaxis = list(title = "Lag Acceleration (g)"),
+      zaxis = list(title = "Lag (s)")
+      # Optional: Adjust camera to zoom out slightly if labels still clip
+      # camera = list(eye = list(x = 1.5, y = 1.5, z = 1.5))
+    )
+  )
+
+
+```
+
+```{r s44}
+#| fig-width: 6
+#| fig-height: 5
+#| cache: true
+#| out-width: "100%"
+
+plot_ly(
+  dens_res,
+  x = ~vm,
+  y = ~lag_vm,
+  z = ~lag,
+  color = ~density,
+  colors = viridis::viridis(100, option = "B"),
+  type = "scatter3d",
+  mode = "markers",
+  marker = list(size = 1, opacity = 0.5) 
+) %>%
+  colorbar(title = "Density") %>%
+  layout(
+    title = list(text = "Predictor for person D", y = 0.95),
+    # INCREASE margins here to prevent label clipping
+    margin = list(l = 80, r = 80, b = 80, t = 0), 
+    scene = list(
+      xaxis = list(title = "Acceleration (g)"),
+      yaxis = list(title = "Lag Acceleration (g)"),
+      zaxis = list(title = "Lag (s)")
+      # Optional: Adjust camera to zoom out slightly if labels still clip
+      # camera = list(eye = list(x = 1.5, y = 1.5, z = 1.5))
+    )
+  )
+
+
+```
+
+:::
+
+::::
+
+---
+
+### Why not use image as predictor directly? 
 #### Functional regression approach 
 
 
@@ -2142,7 +2399,7 @@ Hat tip to [Edward Gunning](https://edwardgunning.github.io/) for the idea for t
 
 ---
 
-### Why not use image directly?
+### Why not use image as predictor directly? 
 
 #### Functional regression approach 
 
@@ -2153,7 +2410,7 @@ Hat tip to [Edward Gunning](https://edwardgunning.github.io/) for the idea for t
 :::
 ---
 
-### Why not use image directly?
+### Why not use image as predictor directly? 
 
 #### Functional regression approach 
 
@@ -2169,7 +2426,7 @@ Three matrices represent every combination of acceleration, lag acceleration, an
 
 ---
 
-### Why not use image directly?
+### Why not use image as predictor directly? 
 
 #### Functional regression approach 
  
@@ -2574,6 +2831,8 @@ plot_ly(
 ### Functional regression: background
 
 ```{r s4}
+#| eval: false
+#| include: false
 #| fig-width: 14
 #| fig-height: 8
 #| cache: true
@@ -2592,7 +2851,7 @@ plot_ly(
 ) %>%
   colorbar(title = "Density") %>%
   layout(
-    title = list(text = "Subset of predictors for one person", y = 0.95),
+    title = list(text = "Predictors for one person", y = 0.95),
     # INCREASE margins here to prevent label clipping
     margin = list(l = 80, r = 80, b = 80, t = 0), 
     scene = list(
@@ -2608,9 +2867,6 @@ plot_ly(
 ```
 
 
----
-
-### Functional regression: background
 
 
 ```{r s5}
@@ -2632,7 +2888,7 @@ plot_ly(
 ) %>%
   colorbar(title = "Density") %>%
   layout(
-    title = list(text = "Subset of predictors for different person", y = 0.95),
+    title = list(text = "Predictors for one person", y = 0.95),
     # INCREASE margins here to prevent label clipping
     margin = list(l = 80, r = 80, b = 80, t = 0), 
     scene = list(
@@ -3177,7 +3433,7 @@ dose_resp %>%
 
 
 
-# Working with other high density data sources
+# Other high density data sources: hemodynamics
 
 ---
 
@@ -3280,172 +3536,6 @@ hts %>%
 
 --- 
 
-#### Hemodynamics and AKI 
-
-```{r bivar plot}
-#| cache: true
-hemo_res %>%
-  ggplot(aes(
-    x = map_fct,
-    y = cvp_fct,
-    fill = estimate,
-    label = format(estimate, digits = 2, nsmall = 2)
-  )) +
-  geom_tile(color = "black") +
-  geom_text() +
-  scale_fill_binned(
-    guide = "colorsteps",
-    palette = function(x)
-      c(
-        "#5D82F0",
-        "#7897F2" ,
-        "#93ACF5" ,
-        "#AEC0F7",
-        "#C9D5FA",
-        "#E4EAFC",
-        "#FFFFFF"
-        ,
-        "#FFE1E1",
-        "#FFC3C3",
-        "#FFA6A6" ,
-        "#FF8888" ,
-        "#FF6B6B" ,
-        "#FF4D4D",
-        "#FF3030"
-      ),
-    breaks = c(
-      0.5,
-      0.6,
-      0.7,
-      0.8,
-      0.9,
-      0.97,
-      1.02,
-      1 / 0.9,
-      1 / 0.8,
-      1 / 0.7,
-      1 / 0.6,
-      1 / 0.5,
-      1 / 0.4,
-      round(max(hemo_res$estimate + .1), 1)
-    )) +
-  theme(legend.position = "none") +
-  labs(
-   x = "MAP Range (mmHg)",
-    y = "CVP Range (mmHg)",
-    title = "Odds Ratios of AKI",
-    subtitle = "Associated with spending 5 additional minutes in given range"
-  )
-  
-```
-
-
----
-
-#### Hemodynamics and AKI 
-
-```{r shell plot}
-#| cache: true 
-g1 = "#AEC0F7"
-g2 = "#FFFFFF"
-g3 = "#FFE1E1"
-g4 = "#FFC3C3"
-g5 = "#FF8888"
-
-
-
-res_plot = 
-  multi_results_plt %>% 
-              select(group, pval, cut_MAP, cut_CVP, estimate) %>% 
-              rename(pval_multi = pval,
-                     estimate_multi = estimate) %>% 
-  mutate(estimate_multi2 = c(0.93, 1.01, 1.02, 1.03, 1.06)) %>% 
-    mutate(num = sub(".*group\\_", "", group),
-         group_lab = paste0("Zone ", num))
-
-plotdf %>%
-  mutate(num = sub(".*group\\_", "", group),
-         group_lab = glue::glue("Zone ", num)) %>% 
-  ggplot(aes(
-    x = cut_MAP,
-    y = cut_CVP,
-    fill = group
-  )) + geom_tile(col = "grey", linewidth = .5) +
-  labs(
-    x = "MAP Range (mmHg)",
-    y = "CVP Range (mmHg)",
-    fill = "Odds Ratio",
-    title = ""
-  ) +
-  scale_fill_manual(values = c(g1, g2, g3, g4, g5))+
-  theme(legend.position = "none")+
-  geom_label(data = res_plot, 
-             aes(x = cut_MAP, y = cut_CVP,
-          label = paste0(group_lab, "\n", "OR = ", estimate_multi2, "\n", pval_multi)),
-             col = "black", hjust = 0, size = 5) +
-  labs(title = "Odds Ratios of AKI",
-    subtitle = "Associated with spending 5 additional minutes in given zone")
-
-```
-
-<div style=" position: absolute; bottom: 0.5em; right: -4em; font-size: 0.7em; color: #777; "> @fine_mapping </div>
-
-::: {.notes}
-Take something "simple" - time series - and make more complex (image) 
-::: 
-
-----
-
-#### Hemodynamics and length of stay 
-
-```{r los}
-#| cache: true 
-# quartiles = quantile(df_surv$group_5, seq(0, 1, .25)); quartiles
-df_surv = 
-  df_surv %>% 
-  mutate(los = los / 24, 
-         lowmap_lowcvp_group = if_else(group_5 < 6, "<5 minutes", "5 or more minutes"))
-
-fit = survfit(Surv(los, event) ~ lowmap_lowcvp_group, data = df_surv)
-ggsurvplot(
-   fit,       
-   fun = "event",
-   xlab = "Time (days)",
-   ylab = "Hospital discharge probability",
-   xlim = c(0, 40),
-   palette = c("#009E73", "#CC79A7"),
-   break.time.by = 10,
-   data = df_surv,  # data used to fit survival curves. 
-   pval = TRUE,             # show p-value of log-rank test.
-   conf.int = TRUE,  
-   pval.coord = c(20, 0.5),
-   legend = "bottom",
-   legend.title = "Zone 5 Exposure Time",
-   legend.labs = c("Less than 5 minutes", "At least 5 minutes"),
-   ggtheme = theme_minimal()
-) 
-```
-
----
-
-### Hemodynamics publications
-
-+ Fine-Mapping the Association of Acute Kidney Injury With Mean Arterial and Central Venous Pressures During Coronary Artery Bypass Surgery [@fine_mapping]
-+ Occurrence of Low Cardiac Index During Normotensive Periods in Cardiac Surgery: A Prospective Cohort Study Using Continuous Noninvasive Cardiac Output Monitoring [@ci]
-+ Assessment of Renal Vein Stasis Index by Transesophageal Echocardiography During Cardiac Surgery: A Feasibility Study [@rvsi]
-+ Assessment of Renal Vein Flow Index by Transesophageal Echocardiography: Precision, Variability, and Association with Cardiac Index During Cardiac Surgery [@rvsi2]
-+ Low Cardiac Index During Periods of Hypotension and Risk of Acute Kidney Injury in Cardiac Surgery. Goeddel, Koffman et al. 2025. *Under review*
-+ Hemodynamic zones of arterial and venous pressure determine risk of kidney injury in cardiac surgery. Goeddel, Zhou, Hernandez, Koffman et al. 2025. *Under review*
-
-
-::: {.notes}
-
-What else is transportable? 
-
-:::
-
----- 
-
 ### Arterial waveform 
 
 :::: {.columns}
@@ -3474,31 +3564,80 @@ What else is transportable?
 
 
 start = 5000
-p0 = 
-  hemo_data0 %>% 
+
+inds = c(5001.3, 5002.35, 5003.35, 5004.3, 
+5005.4, 5006.4, 5007.4,
+5008.4, 5009.45)
+
+hd0 = hemo_data0 %>% 
   mutate(floor_sec = floor(relative_time_sec)) %>% 
   filter(floor_sec >= start & floor_sec < start + 10) %>% 
-  ggplot(aes(x = relative_time_sec, y = abp)) +
+  mutate(beat_id = case_when(
+      relative_time_sec <= inds[1] ~ 1,
+      relative_time_sec <= inds[2] ~ 2,
+      relative_time_sec <= inds[3] ~ 3,
+      relative_time_sec <= inds[4] ~ 4,
+      relative_time_sec <= inds[5] ~ 5,
+      relative_time_sec <= inds[6] ~ 6,
+      relative_time_sec <= inds[7] ~ 7,
+      relative_time_sec <= inds[8] ~ 8,
+      relative_time_sec <= inds[9] ~ 9,
+      .default = 10
+  ))
+p0 =
+  hd0 %>% 
+  ggplot(aes(x = relative_time_sec, y = abp, color = factor(beat_id))) +
   geom_line(linewidth = 1.1) +
   scale_x_continuous(breaks = seq(start, start + 10, 1),
                      labels = seq(0, 10, 1)) +
+  scale_color_viridis_d(option = "B", name = "") +
+  theme(legend.position = "none") +
   scale_y_continuous(limits=c(48, 120), breaks=seq(50,120,10)) +
   labs(x = "Time (s)", y = "Arterial Blood Pressure (mmHg)",
        title = "10s of Arterial Waveform", 
        subtitle = "Patient 1")
 
-p1 = 
+inds2 = c(5001.2, 5002.2, 5003.25,5004.35, 5005.4, 5006.4, 5007.45, 5008.5, 5009.51 )
+hd1 = 
   hemo_data %>% 
   mutate(floor_sec = floor(relative_time_sec)) %>% 
   filter(floor_sec >= start & floor_sec < start + 10) %>% 
-  ggplot(aes(x = relative_time_sec, y = abp)) +
+  mutate(beat_id = case_when(
+      relative_time_sec <= inds2[1] ~ 1,
+      relative_time_sec <= inds2[2] ~ 2,
+      relative_time_sec <= inds2[3] ~ 3,
+      relative_time_sec <= inds2[4] ~ 4,
+      relative_time_sec <= inds2[5] ~ 5,
+      relative_time_sec <= inds2[6] ~ 6,
+      relative_time_sec <= inds2[7] ~ 7,
+      relative_time_sec <= inds2[8] ~ 8,
+      relative_time_sec <= inds2[9] ~ 9,
+      .default = 10
+  ))
+  
+p1 = 
+  hd1 %>% 
+  ggplot(aes(x = relative_time_sec, y = abp, color = factor(beat_id))) +
   geom_line(linewidth = 1.1) +
   scale_x_continuous(breaks = seq(start, start + 10, 1),
                      labels = seq(0, 10, 1)) +
-    scale_y_continuous(limits=c(48, 120), breaks=seq(50,120,10)) +
+  scale_color_viridis_d(option = "B", name = "") +
+  theme(legend.position = "none") +
+  scale_y_continuous(limits=c(48, 120), breaks=seq(50,120,10)) +
   labs(x = "Time (s)", y = "Arterial Blood Pressure (mmHg)",
-       title = "10s of Arterial Waveform", 
-       subtitle = "Patient 2")
+       title = "10s of Arterial Waveform", subtitle = "Patient 2")
+#   hemo_data %>% 
+#   mutate(floor_sec = floor(relative_time_sec)) %>% 
+#   filter(floor_sec >= start & floor_sec < start + 10) %>% 
+#   ggplot(aes(x = relative_time_sec, y = abp)) +
+#   geom_line(linewidth = 1.1) +
+# # scale_x_continuous(breaks=seq(5000, 5010, .5))
+#   scale_x_continuous(breaks = seq(start, start + 10, 1),
+#                      labels = seq(0, 10, 1)) +
+#     scale_y_continuous(limits=c(48, 120), breaks=seq(50,120,10)) +
+#   labs(x = "Time (s)", y = "Arterial Blood Pressure (mmHg)",
+#        title = "10s of Arterial Waveform", 
+#        subtitle = "Patient 2")
 
 p0 + p1
 ```
@@ -3670,12 +3809,86 @@ mean_preds %>%
 
 ---
 
+### Finding underlying features of arterial waveforms 
+
+```{r beats}
+#| cache: true 
+
+# plot aligned beats 
+beats_small %>% 
+  ggplot(aes(x = beat_ind, y = abp_smooth, group = idx, color = id)) +
+  geom_line(alpha = 0.01) +
+  scale_color_viridis_d(option = "B") +
+  scale_x_continuous(breaks = seq(0, 120, 30),
+                     labels = seq(0, 1, 0.25)) +
+  scale_y_continuous(limits = c(20, 200), breaks = seq(0, 200, 20)) +
+  labs(x = "Time (seconds)", y = "Arterial Blood Pressure (mmHg)",
+       title = "Aligned beats from 20 patients") +
+  theme_light() +
+  theme(legend.position = "none")
+```
+
+::: {.notes}
+PCA: single hidden layer autoencoder with a linear activation function.
+
+The principal components are the decoder weights, and the encoder is the pseudo-inverse of the principal components.
+
+Autoencoders give you more flexibility (you get to play with architecture, activation functions etc.) but the optimization problem becomes harder so you may well end up with a less optimal encoder/decoder.
+
+Best possible solution for a simple autoencoder (single hidden layer, linear activation). that is PCA. Easy to compute via linear algebra.
+
+(Autoencoders leverage neural nets for nonlinear compression)
+:::
+
+---
+
+### Functional principal components: two patients 
+
+```{r fpca1}
+#| cache: true 
+
+fpc1 = plot_fpca(fpca1, num_eigen = 3, n_plt = 12, pve = TRUE) +
+  scale_x_continuous(limits=c(0, 120), breaks=seq(0,120,30), labels = seq(0, 1, 0.25)) +
+  scale_y_continuous(limits = c(20, 200), breaks = seq(0, 200, 20)) +
+  scale_color_manual(values = c("#D55E00", "#0072B2"), labels = c("High", "Low"), name = "Score") +
+  theme(legend.position = c(.9, .8)) +
+  labs(title = "First 3 PCs from Patient 1")
+
+fpc2 = plot_fpca(fpca2, num_eigen = 3, n_plt = 12, pve = TRUE) +
+  scale_x_continuous(limits=c(0, 120), breaks=seq(0,120,30), labels = seq(0, 1, 0.25)) +
+  scale_y_continuous(limits = c(20, 200), breaks = seq(0, 200, 20)) +
+  scale_color_manual(values = c("#D55E00", "#0072B2"), labels = c("High", "Low"), name = "Score") +
+  theme(legend.position = c(.9, .8)) +
+labs(title = "First 3 PCs from Patient 2")
+
+fpc1 / fpc2 + plot_layout(guides = "collect", axes = "collect") & theme(legend.position = "bottom")
+```
+
+
+---
+
+### Functional principal components: all patients 
+
+```{r fpca3}
+#| cache: true 
+
+plot_fpca(fpca_res_all, num_eigen = 3, n_plt = 25, pve = TRUE) +
+  scale_x_continuous(limits=c(0, 120), breaks=seq(0,120,30), labels = seq(0, 1, 0.25)) +
+  scale_y_continuous(limits = c(20, 200), breaks = seq(0, 200, 20)) +
+  scale_color_manual(values = c("#D55E00", "#0072B2"), labels = c("High", "Low"), name = "Score") +
+  theme(legend.position = "bottom") +
+  labs(title = "First 3 PCs from All Patients")
+
+```
+
+---
+
+
 ## Future Directions 
 <div style="font-size: 150%;">
 
 ::: {.incremental}
-+ Changes in fingerprint to predict changes in function
-+ Extending survey function on scalar regression to longitudinal outcomes 
++ Changes in fingerprint to predict changes in function (both walking and waveform)
 + Standardizing processing and analysis pipelines for wearable accelerometry 
 + Real-time prediction models for adverse outcomes during surgery
 
@@ -4140,3 +4353,169 @@ p1 +
 
 
 ---
+
+
+### Hemodynamics and AKI 
+
+```{r bivar plot}
+#| cache: true
+hemo_res %>%
+  ggplot(aes(
+    x = map_fct,
+    y = cvp_fct,
+    fill = estimate,
+    label = format(estimate, digits = 2, nsmall = 2)
+  )) +
+  geom_tile(color = "black") +
+  geom_text() +
+  scale_fill_binned(
+    guide = "colorsteps",
+    palette = function(x)
+      c(
+        "#5D82F0",
+        "#7897F2" ,
+        "#93ACF5" ,
+        "#AEC0F7",
+        "#C9D5FA",
+        "#E4EAFC",
+        "#FFFFFF"
+        ,
+        "#FFE1E1",
+        "#FFC3C3",
+        "#FFA6A6" ,
+        "#FF8888" ,
+        "#FF6B6B" ,
+        "#FF4D4D",
+        "#FF3030"
+      ),
+    breaks = c(
+      0.5,
+      0.6,
+      0.7,
+      0.8,
+      0.9,
+      0.97,
+      1.02,
+      1 / 0.9,
+      1 / 0.8,
+      1 / 0.7,
+      1 / 0.6,
+      1 / 0.5,
+      1 / 0.4,
+      round(max(hemo_res$estimate + .1), 1)
+    )) +
+  theme(legend.position = "none") +
+  labs(
+   x = "MAP Range (mmHg)",
+    y = "CVP Range (mmHg)",
+    title = "Odds Ratios of AKI",
+    subtitle = "Associated with spending 5 additional minutes in given range"
+  )
+  
+```
+
+
+---
+
+### Hemodynamics and AKI 
+
+```{r shell plot}
+#| cache: true 
+g1 = "#AEC0F7"
+g2 = "#FFFFFF"
+g3 = "#FFE1E1"
+g4 = "#FFC3C3"
+g5 = "#FF8888"
+
+
+
+res_plot = 
+  multi_results_plt %>% 
+              select(group, pval, cut_MAP, cut_CVP, estimate) %>% 
+              rename(pval_multi = pval,
+                     estimate_multi = estimate) %>% 
+  mutate(estimate_multi2 = c(0.93, 1.01, 1.02, 1.03, 1.06)) %>% 
+    mutate(num = sub(".*group\\_", "", group),
+         group_lab = paste0("Zone ", num))
+
+plotdf %>%
+  mutate(num = sub(".*group\\_", "", group),
+         group_lab = glue::glue("Zone ", num)) %>% 
+  ggplot(aes(
+    x = cut_MAP,
+    y = cut_CVP,
+    fill = group
+  )) + geom_tile(col = "grey", linewidth = .5) +
+  labs(
+    x = "MAP Range (mmHg)",
+    y = "CVP Range (mmHg)",
+    fill = "Odds Ratio",
+    title = ""
+  ) +
+  scale_fill_manual(values = c(g1, g2, g3, g4, g5))+
+  theme(legend.position = "none")+
+  geom_label(data = res_plot, 
+             aes(x = cut_MAP, y = cut_CVP,
+          label = paste0(group_lab, "\n", "OR = ", estimate_multi2, "\n", pval_multi)),
+             col = "black", hjust = 0, size = 5) +
+  labs(title = "Odds Ratios of AKI",
+    subtitle = "Associated with spending 5 additional minutes in given zone")
+
+```
+
+<div style=" position: absolute; bottom: 0.5em; right: -4em; font-size: 0.7em; color: #777; "> @fine_mapping </div>
+
+::: {.notes}
+Take something "simple" - time series - and make more complex (image) 
+::: 
+
+----
+
+### Hemodynamics and length of stay 
+
+```{r los}
+#| cache: true 
+# quartiles = quantile(df_surv$group_5, seq(0, 1, .25)); quartiles
+df_surv = 
+  df_surv %>% 
+  mutate(los = los / 24, 
+         lowmap_lowcvp_group = if_else(group_5 < 6, "<5 minutes", "5 or more minutes"))
+
+fit = survfit(Surv(los, event) ~ lowmap_lowcvp_group, data = df_surv)
+ggsurvplot(
+   fit,       
+   fun = "event",
+   xlab = "Time (days)",
+   ylab = "Hospital discharge probability",
+   xlim = c(0, 40),
+   palette = c("#009E73", "#CC79A7"),
+   break.time.by = 10,
+   data = df_surv,  # data used to fit survival curves. 
+   pval = TRUE,             # show p-value of log-rank test.
+   conf.int = TRUE,  
+   pval.coord = c(20, 0.5),
+   legend = "bottom",
+   legend.title = "Zone 5 Exposure Time",
+   legend.labs = c("Less than 5 minutes", "At least 5 minutes"),
+   ggtheme = theme_minimal()
+) 
+```
+
+---
+
+### Hemodynamics publications
+
++ Fine-Mapping the Association of Acute Kidney Injury With Mean Arterial and Central Venous Pressures During Coronary Artery Bypass Surgery [@fine_mapping]
++ Occurrence of Low Cardiac Index During Normotensive Periods in Cardiac Surgery: A Prospective Cohort Study Using Continuous Noninvasive Cardiac Output Monitoring [@ci]
++ Assessment of Renal Vein Stasis Index by Transesophageal Echocardiography During Cardiac Surgery: A Feasibility Study [@rvsi]
++ Assessment of Renal Vein Flow Index by Transesophageal Echocardiography: Precision, Variability, and Association with Cardiac Index During Cardiac Surgery [@rvsi2]
++ Low Cardiac Index During Periods of Hypotension and Risk of Acute Kidney Injury in Cardiac Surgery. Goeddel, Koffman et al. 2025. *Under review*
++ Hemodynamic zones of arterial and venous pressure determine risk of kidney injury in cardiac surgery. Goeddel, Zhou, Hernandez, Koffman et al. 2025. *Under review*
+
+
+::: {.notes}
+
+What else is transportable? 
+
+:::
+
