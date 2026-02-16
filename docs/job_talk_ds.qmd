@@ -161,7 +161,7 @@ okabe_ito <- c(
 )
 
 showtext_auto()
-font_add_google("Source Sans Pro", "Source Sans Pro")
+font_add_google("Source Sans 3", "Source Sans Pro")
 theme_set(
   theme_minimal(base_family = "Source Sans Pro") +
     theme(
@@ -940,7 +940,7 @@ arrow_plot = ggplot() +
 ```
 
 ```{r fprints 3a}
-#| cache: true 
+ 
 
 s1_dens = 
  dens_df_s2_l15 %>% mutate(lag = "Lag = 0.15s") %>% 
@@ -973,7 +973,7 @@ fprint_plot1 =
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank())
 
-p2b = arrow_plot + fprint_plot1 + plot_layout(widths = c(0.1, 0.9))
+p2b = arrow_plot + fprint_plot1 + plot_layout(widths = c(0.15, 0.85))
 
 ```
 
@@ -1058,7 +1058,7 @@ p2  =
   annotate(geom = "label", x = 5.5, y = 7.5, label = "Predictors from person B", color = "#56B4E9", size = 5) +
   annotate(geom = "label", x = 5.5, y = 12.5, label = "Predictors from person C", color = "#009E73", size = 5) 
 
-p2a = arrow_plot + p2 + plot_layout(widths = c(0.1, 0.9))
+p2a = arrow_plot + p2 + plot_layout(widths = c(0.15, 0.85))
 ```
 
 ```{r print arrow x }
@@ -2239,8 +2239,8 @@ plot_grid(p11, p2b, p_empty, ncol = 3, align = "v", rel_widths = c(1, 1, 1))
 
 
 ```{r s41}
-#| fig-width: 6
-#| fig-height: 5
+#| fig-width: 7
+#| fig-height: 4
 #| cache: true
 #| out-width: "100%"
 
@@ -2276,8 +2276,8 @@ plot_ly(
 
 
 ```{r s42}
-#| fig-width: 6
-#| fig-height: 5
+#| fig-width: 7
+#| fig-height: 4
 #| cache: true
 #| out-width: "100%"
 
@@ -2314,8 +2314,8 @@ plot_ly(
 ::: {.column width="50%"}
 
 ```{r s43}
-#| fig-width: 6
-#| fig-height: 5
+#| fig-width: 7
+#| fig-height: 4
 #| cache: true
 #| out-width: "100%"
 
@@ -2348,8 +2348,8 @@ plot_ly(
 ```
 
 ```{r s44}
-#| fig-width: 6
-#| fig-height: 5
+#| fig-width: 7
+#| fig-height: 4
 #| cache: true
 #| out-width: "100%"
 
@@ -3824,7 +3824,6 @@ beats_small %>%
   scale_y_continuous(limits = c(20, 200), breaks = seq(0, 200, 20)) +
   labs(x = "Time (seconds)", y = "Arterial Blood Pressure (mmHg)",
        title = "Aligned beats from 20 patients") +
-  theme_light() +
   theme(legend.position = "none")
 ```
 
@@ -3849,14 +3848,14 @@ Best possible solution for a simple autoencoder (single hidden layer, linear act
 
 fpc1 = plot_fpca(fpca1, num_eigen = 3, n_plt = 12, pve = TRUE) +
   scale_x_continuous(limits=c(0, 120), breaks=seq(0,120,30), labels = seq(0, 1, 0.25)) +
-  scale_y_continuous(limits = c(20, 200), breaks = seq(0, 200, 20)) +
+  scale_y_continuous(limits = c(20, 200), breaks = seq(0, 200, 30)) +
   scale_color_manual(values = c("#D55E00", "#0072B2"), labels = c("High", "Low"), name = "Score") +
   theme(legend.position = c(.9, .8)) +
   labs(title = "First 3 PCs from Patient 1")
 
 fpc2 = plot_fpca(fpca2, num_eigen = 3, n_plt = 12, pve = TRUE) +
   scale_x_continuous(limits=c(0, 120), breaks=seq(0,120,30), labels = seq(0, 1, 0.25)) +
-  scale_y_continuous(limits = c(20, 200), breaks = seq(0, 200, 20)) +
+  scale_y_continuous(limits = c(20, 200), breaks = seq(0, 200, 30)) +
   scale_color_manual(values = c("#D55E00", "#0072B2"), labels = c("High", "Low"), name = "Score") +
   theme(legend.position = c(.9, .8)) +
 labs(title = "First 3 PCs from Patient 2")
