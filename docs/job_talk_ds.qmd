@@ -2350,11 +2350,10 @@ plot_ly(
 ```{r s44}
 #| fig-width: 7
 #| fig-height: 4
-#| cache: true
 #| out-width: "100%"
 
 plot_ly(
-  dens_res,
+  dens_res8,
   x = ~vm,
   y = ~lag_vm,
   z = ~lag,
