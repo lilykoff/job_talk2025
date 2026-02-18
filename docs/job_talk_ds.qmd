@@ -616,6 +616,11 @@ beats_small = read_rds(here::here("docs", "data", "aligned_beats_sample.rds"))
 fpca1 = read_rds(here::here("docs", "data", "fpca_res_1.rds"))
 fpca2 = read_rds(here::here("docs", "data", "fpca_res_2.rds"))
 fpca_res_all = read_rds(here::here("docs", "data", "fpca_res_allbeats.rds"))
+
+## predictions
+
+plot_list = read_rds(here::here("docs", "data", "well_pred.rds"))
+plot_list2 = read_rds(here::here("docs", "data", "poor_pred.rds"))
 ```
 
 
@@ -3267,6 +3272,29 @@ p4 = sample_dat2 %>%
 
 ---
 
+#### Digital fingerprinting in NHANES
+
+```{r wpred}
+#| cache: true 
+
+p2 = plot_list[[1]] + plot_list[[2]] + plot_list[[3]]  +
+  plot_layout(nrow = 1, axes = 'collect') + plot_annotation(title = "Well-Predicted Participants")
+p2
+```
+
+---
+
+#### Digital fingerprinting in NHANES
+
+```{r ppred}
+#| cache: true 
+
+p2 = plot_list2[[1]] + plot_list2[[2]] + plot_list2[[3]]  +
+  plot_layout(nrow = 1, axes = 'collect') + plot_annotation(title = "Poorly-Predicted Participants")
+p2
+```
+
+---
 
 ## Outline {.question-bullets}
 <div style="font-size: 115%;">
