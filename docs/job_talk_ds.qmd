@@ -3196,14 +3196,17 @@ $\rightarrow$ Yes!
 - <span style="color:#009E73;">100\%</span> rank-5\% accuracy (correct subject is in the top 650 predictions)
 
 </div>
+<div style=" position: absolute; bottom: 0.5em; right: -4em; font-size: 0.7em; color: #777; "> @nhanes_fprint </div>
+
 ---
 
 
-### Digital fingerprinting in NHANES 
 
 
 ```{r nh fingerprint}
 #| cache: true
+#| eval: false
+#| include: false 
 p1 = dens_df %>%
   filter(id == 78898) %>%
   mutate(data = factor(data, levels = c("train", "test"), labels = c("Training", "Testing"))) %>%
@@ -3268,9 +3271,7 @@ p4 = sample_dat2 %>%
 (p2 + p1) / (p4 + p3)
 ```
 
-<div style=" position: absolute; bottom: 0.5em; right: -4em; font-size: 0.7em; color: #777; "> @nhanes_fprint </div>
 
----
 
 #### Digital fingerprinting in NHANES
 
@@ -4329,13 +4330,15 @@ p1 = df2 %>%
   scale_x_continuous(breaks= c(60, seq(240, 1440, 4 * 60)), labels = c("01:00", "04:00", "08:00", "12:00", "16:00", "20:00", "24:00")) +
   labs(x = "Hour of Day", y = "Steps per minute") +
   scale_color_manual(values = c("#E69F00", "#009E73FF"), name = "Model") +
-  theme(legend.position = "bottom")
+  theme(legend.position = "bottom") +
+geom_ribbon(aes(x = s, ymin = lower, ymax = upper, fill = model), alpha = 0)
 p1
 ```
 
 ---
 
-### Sex differences in steps: complex survey function on scalar regression
+### Survey function on scalar regression: application
+
 
 ```{r steps application w ci}
 #| cache: true
