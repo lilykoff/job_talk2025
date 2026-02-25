@@ -142,7 +142,7 @@ plot_fpca = function(fpca_res, num_eigen = 4, n_plt = 10, seed = 213, pve = FALS
     ggplot() +
     geom_line(aes(x = sind, y = value, group = id_q, color = quantile), alpha=0.25) +
     facet_wrap(~ pc, ncol = 3) +
-    labs(x = "Time (sec)", y = "Arterial Blood Pressure (mmHg)") +
+    labs(x = "Time (seconds)", y = "Arterial Blood Pressure (mmHg)") +
     geom_line(data = df_mu,
               aes(x = sind, y = value, group = quantile, color = quantile),
               linewidth = 1.1)
@@ -1094,9 +1094,9 @@ plot_grid(p11, p2b, p2a, ncol = 3, align = "v", rel_widths = c(1, 1, 1))
 ### Details of the method
 
 ::: {.incremental}
-**For each second and each person**: 
 <div style="font-size: 150%;">
 
+**For each second and each person**: 
 
 + Obtain joint distribution of acceleration and lag acceleration for a series of lags (image) 
 
@@ -3094,16 +3094,16 @@ Grid cell approach: piecewise const version of F, where effect is constant withi
 
 ::: {.column width="45%"}
 
-Rank-1 (rank-5) % accuracies 
+Rank-1 % accuracies 
 
 
 + Train and test on session 1
-  + Logistic regression: 92 (97) 
-  + <span style="color:#009E73;">Functional regression: 98 (100)</span>
+  + Logistic regression w/ grid cells: 92 
+  + <span style="color:#009E73;">Functional regression: 98 </span>
 
 + Train on session 1, test on session 2 
-  + Logistic regression: 41 (75)
-  + <span style="color:#009E73;">Functional regression: 53 (69)</span>
+  + Logistic regression w/ grid cells: 41 
+  + <span style="color:#009E73;">Functional regression: 53 </span>
 :::
 
 ::: {.column width="55%"}
@@ -3120,18 +3120,18 @@ Rank-1 (rank-5) % accuracies
 
 ::: {.column width="45%"}
 
-Rank-1 (rank-5) % accuracies 
+Rank-1 % accuracies
 
 
 + Train and test on session 1
-  + Logistic regression: 92 (97) 
-  + <span style="color:#009E73;">Functional regression: 98 (100)</span>
-  + XGBoost: 93 (99)
+  + Logistic regression w/ grid cells: 92 
+  + <span style="color:#009E73;">Functional regression: 98 </span>
+  + XGBoost w/ grid cells: 93 
 
 + Train on session 1, test on session 2 
-  + Logistic regression: 41 (75)
-  + Functional regression: 53 (69)
-  + <span style="color:#009E73;">XGBoost: 58 (78)</span>
+  + Logistic regression w/ grid cells: 41 
+  + Functional regression: 53 
+  + <span style="color:#009E73;">XGBoost w/ grid cells: 58</span>
 
 :::
 
@@ -3179,6 +3179,18 @@ $\rightarrow$ Yes!
 
 
 # Can we identify someone from their walking pattern measured by a wrist-worn accelerometer in big, free-living datasets?
+
+---
+
+### Digital fingerprinting in NHANES 
+
+<div style="font-size: 125%;">
+
+- Use highly specific method to identify walking in NHANES (minimize false positives) [@Karas2019]
+- $N = 13{,}000$ individuals with 3 minutes walking per person 
+- 3:1 train/test split 
+- Logistic regression + weighting to overcome class imbalance
+</div>
 
 ---
 
@@ -3453,6 +3465,7 @@ dose_resp %>%
 <br>
 <span style="color:gray;">$\rightarrow$ Yes! </span>
 - <span style="color:gray;"> Can we identify someone from their walking pattern measured by a wrist-worn accelerometer in big, free-living datasets? </span>
+<br>
 <span style="color:gray;">$\rightarrow$ Yes! </span>
 <br>
 - <span style="color:gray;">What else can we learn from walking patterns in free-living data? </span>
@@ -3562,26 +3575,11 @@ hts %>%
 + Central venous pressure (CVP): pressure of blood returning to heart 
 :::
 
---- 
+---
 
 ### Arterial waveform 
 
-:::: {.columns}
-
-::: {.column width="50%"}
-
-![](figs/a_line.png){.equalheight}
-
-:::
-
-
-::: {.column width="50%"}
-
-
-![](figs/abp4.png){.equalheight}
-:::
-
-::::
+![](figs/a_line_v2.png)
 
 ---
 
@@ -3799,7 +3797,7 @@ pt1 + pt2
 ---
 
 
-### Fingerprinting with arterial waveform
+### Arterial waveforms are patient-specific 
 
 ```{r xgb accuracy}
 #| cache: true
@@ -3835,9 +3833,17 @@ mean_preds %>%
 
 ```
 
----
+::: {.notes}
 
-### Finding underlying features of arterial waveforms 
+The XGboost model can identify the correct patient, which confirms that arterial waveforms are highly patient-specific, like walking patterns. 
+
+But we're also interested in how patients are different from one another. One way to do that is to extract the underlying features of these beats.
+
+::: 
+
+---
+ 
+### Arterial waveforms feature extraction
 
 ```{r beats}
 #| cache: true 
@@ -3855,17 +3861,17 @@ beats_small %>%
   theme(legend.position = "none")
 ```
 
+
 ::: {.notes}
-PCA: single hidden layer autoencoder with a linear activation function.
 
-The principal components are the decoder weights, and the encoder is the pseudo-inverse of the principal components.
+So here's a plot of the beats from 20 different patients, each color is a different patient. We want to find a lower dimensional representation of this data that preserves as much information as possible. We can do this with any autoencoder. 
 
-Autoencoders give you more flexibility (you get to play with architecture, activation functions etc.) but the optimization problem becomes harder so you may well end up with a less optimal encoder/decoder.
+We'll use principal components analysis here - which is just a single hidden layer autoencoder with a linear activation function. While using PCA might lose some nonlinear dynamics, it is easy to both compute and the eigenfunctions are physically interpretable. Let's look at the results! 
 
-Best possible solution for a simple autoencoder (single hidden layer, linear activation). that is PCA. Easy to compute via linear algebra.
 
-(Autoencoders leverage neural nets for nonlinear compression)
-:::
+::: 
+
+
 
 ---
 
@@ -3891,6 +3897,12 @@ labs(title = "First 3 PCs from Patient 2")
 fpc1 / fpc2 + plot_layout(guides = "collect", axes = "collect") & theme(legend.position = "bottom")
 ```
 
+::: {.notes}
+Here are first 3 PCs from two different patients
+Orange curve: mean curve among beats in top 10% of PC1 scores (i.e. those with highest values of PC1)
+Blue curve: mean curve among beats in bottom 10% of PC1 scores (i.e. those with lowest values of PC1)
+
+::: 
 
 ---
 
