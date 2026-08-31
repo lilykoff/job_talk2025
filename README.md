@@ -8,7 +8,7 @@
 
 [Shorter (~45 minute) version](https://lilykoff.github.io/job_talk2025/job_talk_short.html)
 
-[Data science focused version]((https://lilykoff.github.io/job_talk2025/job_talk_ds.html)
+[Data science focused version](https://lilykoff.github.io/job_talk2025/job_talk_ds.html)
 
 **Title**: Methods and Applications for High-Frequency Biosignals Data
 
